@@ -108,12 +108,12 @@ export async function POST(request: Request) {
           { type: "web_fetch_20260209", name: "web_fetch", max_uses: 10 },
         ];
 
-        // Fable 5: thinking is always on (omit the thinking param). Include
+        // Opus 5: omitting the thinking param runs adaptive thinking. Include
         // server-side refusal fallbacks by default so a benign false-positive
         // safety decline is re-served by the recommended fallback model.
         const makeParams = (withFormat: boolean) =>
           ({
-            model: "claude-fable-5",
+            model: "claude-opus-5",
             max_tokens: 64000,
             betas: ["server-side-fallback-2026-07-01"],
             fallbacks: "default",

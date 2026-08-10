@@ -22,9 +22,11 @@ gold. You can download the annotated image.
 - Next.js (App Router) frontend with a camera capture flow. Photos are
   downscaled client-side to Claude's high-resolution vision limit (2576 px long
   edge) so bounding-box coordinates map 1:1 to pixels.
-- `/api/analyze` calls **Claude Fable 5** (`claude-fable-5`) with the
+- `/api/analyze` calls **Claude Opus 5** (`claude-opus-5`) with the
   server-side **web search** and **web fetch** tools, so the model researches
-  prices (Wine-Searcher etc.) and ratings (Vivino, CellarTracker) live.
+  prices (Wine-Searcher etc.) and ratings (Vivino, CellarTracker) live. To use
+  Claude Fable 5 instead (higher capability, 2x the token price), change the
+  `model` string in `app/api/analyze/route.ts` to `claude-fable-5`.
 - Structured outputs (`output_config.format`) constrain the answer to a JSON
   schema including per-bottle pixel bounding boxes, prices, ratings, and a
   best-value verdict.
