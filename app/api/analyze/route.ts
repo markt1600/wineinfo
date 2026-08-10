@@ -67,7 +67,7 @@ Research budget: research at most ${MAX_RESEARCH} wines in this photo. If more a
 Prices and value:
 - listedPrice: the price printed in the photo for that bottle/menu line, if any.
 ${currencyNote}
-- If the scene is shelf_with_prices or wine_menu AND the currency is known: compare each listed price against the wine's market price (convert currencies approximately if needed) and write a short valueAssessment (e.g. "listed 20% below typical retail — good value" or "3.2x retail markup — typical restaurant pricing"). Then pick the single best value-for-money entry and put its id in bestValue.bottleId with your reasoning. Consider quality (ratings) as well as price ratio — a slightly worse ratio on a much better-rated wine can still be the best value.
+- If the scene is shelf_with_prices or wine_menu AND the currency is known: compare each listed price against the wine's market price (convert currencies approximately if needed). Set priceDeltaPct = ((listed − market) / market) × 100 rounded to a whole number — positive means marked up over market, negative means discounted (use the currency-converted values; null when either price is missing or the currency is unconfirmed). Also write a short valueAssessment (e.g. "listed 20% below typical retail — good value" or "3.2x retail markup — typical restaurant pricing"). Then pick the single best value-for-money entry and put its id in bestValue.bottleId with your reasoning. Consider quality (ratings) as well as price ratio — a slightly worse ratio on a much better-rated wine can still be the best value.
 - If there are no listed prices, or the currency is unconfirmed, set bestValue.bottleId to null.
 
 Finish with a concise, friendly summary (2-4 sentences) of what you found.

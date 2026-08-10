@@ -303,7 +303,8 @@ export default function InfographicCard({
           y + rowH / 2 + 34
         );
 
-        // right-aligned listed price (falls back to market price)
+        // right-aligned listed price (falls back to market price), with the
+        // markup/discount vs market underneath — red markup, green discount
         const price = b.listedPrice ?? b.marketPrice;
         if (price && price.currency !== "UNK") {
           ctx.font = "bold 40px sans-serif";
@@ -315,9 +316,22 @@ export default function InfographicCard({
             y + rowH / 2 + 4
           );
           if (b.listedPrice) {
-            ctx.font = "26px sans-serif";
-            ctx.fillStyle = "#c9a3ad";
-            const sub = "listed";
+            ctx.font = "bold 27px sans-serif";
+            let sub: string;
+            if (b.priceDeltaPct != null && Math.abs(b.priceDeltaPct) >= 1) {
+              const markup = b.priceDeltaPct > 0;
+              sub = markup
+                ? `+${Math.round(b.priceDeltaPct)}% vs mkt`
+                : `−${Math.round(Math.abs(b.priceDeltaPct))}% vs mkt`;
+              ctx.fillStyle = markup ? "#ff6b6b" : "#3ddc84";
+            } else if (b.priceDeltaPct != null) {
+              sub = "≈ market";
+              ctx.fillStyle = "#c9a3ad";
+            } else {
+              sub = "listed";
+              ctx.fillStyle = "#c9a3ad";
+              ctx.font = "26px sans-serif";
+            }
             ctx.fillText(
               sub,
               W - PAD - ctx.measureText(sub).width,

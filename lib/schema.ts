@@ -41,6 +41,7 @@ export interface BottleResult {
   listedPrice: Money | null; // price shown in the photo (shelf tag or menu)
   marketPrice: Money | null; // typical retail price found online
   marketPriceSource: string | null;
+  priceDeltaPct: number | null; // listed vs market: +40 = 40% markup, -15 = 15% discount
   ratings: Rating[];
   valueAssessment: string | null; // short judgement of listed vs market price
   notes: string;
@@ -131,6 +132,11 @@ export const analysisJsonSchema = {
           listedPrice: moneySchema,
           marketPrice: moneySchema,
           marketPriceSource: { type: ["string", "null"] },
+          priceDeltaPct: {
+            type: ["number", "null"],
+            description:
+              "((listed - market) / market) * 100, rounded; positive = markup over market price, negative = discount. Null when either price is missing.",
+          },
           ratings: {
             type: "array",
             items: {
@@ -166,6 +172,7 @@ export const analysisJsonSchema = {
           "listedPrice",
           "marketPrice",
           "marketPriceSource",
+          "priceDeltaPct",
           "ratings",
           "valueAssessment",
           "notes",

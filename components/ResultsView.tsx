@@ -18,6 +18,26 @@ function money(m: { amount: number; currency: string } | null): string | null {
   }
 }
 
+// +40 → red markup, −15 → green discount, within ±1% → neutral
+function DeltaBadge({ pct }: { pct: number }) {
+  if (Math.abs(pct) < 1) {
+    return <span style={{ color: "var(--muted)" }}>≈ market price</span>;
+  }
+  const markup = pct > 0;
+  return (
+    <span
+      style={{
+        color: markup ? "#d70015" : "#248a3d",
+        fontWeight: 600,
+      }}
+    >
+      {markup
+        ? `+${Math.round(pct)}% above market`
+        : `−${Math.round(Math.abs(pct))}% below market`}
+    </span>
+  );
+}
+
 function RatingRow({ r }: { r: BottleResult["ratings"][number] }) {
   const score = (
     <>
@@ -96,6 +116,14 @@ function BottleCard({
                   ({bottle.marketPriceSource})
                 </span>
               )}
+            </dd>
+          </>
+        )}
+        {bottle.priceDeltaPct != null && (
+          <>
+            <dt>Vs market</dt>
+            <dd>
+              <DeltaBadge pct={bottle.priceDeltaPct} />
             </dd>
           </>
         )}
