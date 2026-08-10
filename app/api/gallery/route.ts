@@ -24,8 +24,12 @@ function galleryEnabled(): boolean {
 }
 
 export async function GET(request: Request) {
-  if (!galleryEnabled()) {
-    return Response.json({ enabled: false, entries: [], total: 0 });
+  const storage = {
+    redis: getRedis() !== null,
+    blob: !!process.env.BLOB_READ_WRITE_TOKEN,
+  };
+  if (!storage.redis || !storage.blob) {
+    return Response.json({ enabled: false, storage, entries: [], total: 0 });
   }
   try {
     const limitParam = new URL(request.url).searchParams.get("limit");
@@ -38,10 +42,10 @@ export async function GET(request: Request) {
       redis.lrange<GalleryEntry>(LIST_KEY, 0, limit - 1),
       redis.llen(LIST_KEY),
     ]);
-    return Response.json({ enabled: true, entries, total });
+    return Response.json({ enabled: true, storage, entries, total });
   } catch (err) {
     console.error("gallery list failed:", err);
-    return Response.json({ enabled: false, entries: [], total: 0 });
+    return Response.json({ enabled: false, storage, entries: [], total: 0 });
   }
 }
 

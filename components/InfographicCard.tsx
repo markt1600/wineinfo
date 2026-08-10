@@ -335,7 +335,7 @@ export default function InfographicCard({
       <button className="btn" onClick={download} style={{ marginTop: 12 }}>
         Download summary card
       </button>
-      {saveState === "saved" && (
+      {saveState !== "pending" && (
         <p
           style={{
             color: "var(--muted)",
@@ -344,7 +344,9 @@ export default function InfographicCard({
             textAlign: "center",
           }}
         >
-          ✓ Saved to recent scans
+          {saveState === "saved"
+            ? "✓ Saved to recent scans"
+            : "⚠️ Not saved — scan-history storage isn't configured (see the note below)"}
         </p>
       )}
     </div>

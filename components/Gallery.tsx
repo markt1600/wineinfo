@@ -29,6 +29,9 @@ export default function Gallery({
   const [entries, setEntries] = useState<GalleryEntry[] | null>(null);
   const [total, setTotal] = useState(0);
   const [enabled, setEnabled] = useState(true);
+  const [storage, setStorage] = useState<{ redis: boolean; blob: boolean } | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +41,7 @@ export default function Gallery({
       .then((data) => {
         if (cancelled) return;
         setEnabled(!!data.enabled);
+        setStorage(data.storage ?? null);
         setEntries(Array.isArray(data.entries) ? data.entries : []);
         setTotal(Number(data.total) || 0);
       })
@@ -49,7 +53,40 @@ export default function Gallery({
     };
   }, [refreshKey, limit]);
 
-  if (!enabled || !entries || entries.length === 0) return null;
+  if (entries === null && enabled) return null; // still loading
+
+  // Storage not configured — say exactly what's missing instead of hiding.
+  if (!enabled) {
+    const missing = [
+      !storage?.redis && "an Upstash Redis database",
+      !storage?.blob && "a Blob store",
+    ]
+      .filter(Boolean)
+      .join(" and ");
+    return (
+      <div className="card">
+        <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>{title}</h2>
+        <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+          ⚠️ Scan history is off — this deployment is missing{" "}
+          {missing || "storage configuration"}. In Vercel, open the project's
+          <strong> Storage</strong> tab, create/connect it, then redeploy.
+          Scans made before storage is connected are not saved.
+        </p>
+      </div>
+    );
+  }
+
+  if (!entries || entries.length === 0) {
+    return (
+      <div className="card">
+        <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>{title}</h2>
+        <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
+          No scans saved yet — analyze a photo and its summary card will show
+          up here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
