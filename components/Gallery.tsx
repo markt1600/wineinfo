@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 interface GalleryEntry {
+  id?: string; // present on entries with a full saved analysis
   url: string;
   caption: string;
   sceneType: string;
   at: string;
+}
+
+// Full replay when the analysis was saved; legacy entries fall back to the
+// plain image viewer.
+function entryHref(e: GalleryEntry): string {
+  return e.id
+    ? `/scan?id=${encodeURIComponent(e.id)}`
+    : `/card?src=${encodeURIComponent(e.url)}&caption=${encodeURIComponent(e.caption)}&at=${encodeURIComponent(e.at)}`;
 }
 
 interface Props {
@@ -111,11 +120,7 @@ export default function Gallery({
       </p>
       <div className="gallery-grid">
         {entries.map((e) => (
-          <Link
-            key={e.url}
-            href={`/card?src=${encodeURIComponent(e.url)}&caption=${encodeURIComponent(e.caption)}&at=${encodeURIComponent(e.at)}`}
-            className="gallery-item"
-          >
+          <Link key={e.url} href={entryHref(e)} className="gallery-item">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={e.url} alt={e.caption || "Wine summary card"} loading="lazy" />
             <span>

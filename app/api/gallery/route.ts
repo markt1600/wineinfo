@@ -1,22 +1,37 @@
 import { del, put } from "@vercel/blob";
 import { getRedis } from "@/lib/redis";
+import type { AnalysisResult } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Shared history of summary cards. Every analysis auto-saves its card:
-// image in Vercel Blob, metadata in a capped Redis list (newest first).
-// Entries past the cap are trimmed and their blobs deleted, bounding
-// storage to roughly 100 MB worst case.
+// Shared history of scans. Every analysis auto-saves: the summary-card
+// image and the analyzed photo go to Vercel Blob, the full analysis
+// result JSON goes to Redis (scan:<id>), and a capped Redis list holds
+// the feed metadata (newest first). Entries past the cap are trimmed
+// with their blobs and records deleted.
 const LIST_KEY = "gallery:entries";
+const SCAN_KEY_PREFIX = "scan:";
 const MAX_ENTRIES = 200;
-const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+const MAX_CARD_BYTES = 1.5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 2.2 * 1024 * 1024;
 
 export interface GalleryEntry {
-  url: string;
+  id?: string; // scan record key suffix (absent on legacy entries)
+  url: string; // summary card image
   caption: string;
   sceneType: string;
   at: string; // ISO timestamp
+}
+
+export interface ScanRecord {
+  id: string;
+  cardUrl: string;
+  photoUrl: string; // the analyzed photo (same pixel size as analysis)
+  caption: string;
+  sceneType: string;
+  at: string;
+  result: AnalysisResult;
 }
 
 // Vercel injects BLOB_READ_WRITE_TOKEN by default, but a store connected
@@ -75,7 +90,9 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as {
-    image?: string; // base64 JPEG, no data: prefix
+    image?: string; // base64 JPEG summary card, no data: prefix
+    photo?: string; // base64 JPEG of the analyzed photo
+    result?: AnalysisResult;
     caption?: string;
     sceneType?: string;
   };
@@ -83,44 +100,86 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing image" }, { status: 400 });
   }
 
-  const bytes = Buffer.from(body.image, "base64");
-  if (bytes.length > MAX_IMAGE_BYTES) {
-    return Response.json({ error: "Image too large" }, { status: 413 });
+  const cardBytes = Buffer.from(body.image, "base64");
+  if (cardBytes.length > MAX_CARD_BYTES) {
+    return Response.json({ error: "Card image too large" }, { status: 413 });
+  }
+  const photoBytes = body.photo ? Buffer.from(body.photo, "base64") : null;
+  if (photoBytes && photoBytes.length > MAX_PHOTO_BYTES) {
+    return Response.json({ error: "Photo too large" }, { status: 413 });
   }
 
-  const blob = await put(`gallery/card-${Date.now()}.jpg`, bytes, {
-    access: "public",
-    contentType: "image/jpeg",
-    addRandomSuffix: true,
-    token: getBlobToken(),
-  });
+  const token = getBlobToken();
+  const id = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const uploaded: string[] = [];
 
-  const entry: GalleryEntry = {
-    url: blob.url,
-    caption: (body.caption ?? "").slice(0, 220),
-    sceneType: body.sceneType ?? "other",
-    at: new Date().toISOString(),
-  };
-
-  const redis = getRedis()!;
   try {
+    const card = await put(`gallery/${id}-card.jpg`, cardBytes, {
+      access: "public",
+      contentType: "image/jpeg",
+      addRandomSuffix: true,
+      token,
+    });
+    uploaded.push(card.url);
+
+    let photoUrl = "";
+    if (photoBytes) {
+      const photo = await put(`gallery/${id}-photo.jpg`, photoBytes, {
+        access: "public",
+        contentType: "image/jpeg",
+        addRandomSuffix: true,
+        token,
+      });
+      uploaded.push(photo.url);
+      photoUrl = photo.url;
+    }
+
+    const at = new Date().toISOString();
+    const caption = (body.caption ?? "").slice(0, 220);
+    const sceneType = body.sceneType ?? "other";
+    const entry: GalleryEntry = { id, url: card.url, caption, sceneType, at };
+
+    const redis = getRedis()!;
+    // Full record for the replay view, when the client sent the analysis.
+    if (body.result && photoUrl) {
+      const record: ScanRecord = {
+        id,
+        cardUrl: card.url,
+        photoUrl,
+        caption,
+        sceneType,
+        at,
+        result: body.result,
+      };
+      await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
+    }
+
     await redis.lpush(LIST_KEY, entry);
-    // Delete blobs for anything that falls off the end of the feed.
+    // Trim the feed and fully delete anything that falls off the end.
     const evicted = await redis.lrange<GalleryEntry>(LIST_KEY, MAX_ENTRIES, -1);
     await redis.ltrim(LIST_KEY, 0, MAX_ENTRIES - 1);
-    await Promise.all(
-      evicted.map((e) =>
-        del(e.url, { token: getBlobToken() }).catch((err) =>
-          console.error("gallery blob delete failed:", err)
-        )
-      )
-    );
-  } catch (err) {
-    console.error("gallery push failed:", err);
-    // Don't leave an orphaned blob if we couldn't record it.
-    await del(blob.url, { token: getBlobToken() }).catch(() => {});
-    return Response.json({ error: "Could not save to gallery" }, { status: 500 });
-  }
+    for (const e of evicted) {
+      del(e.url, { token }).catch((err) =>
+        console.error("gallery blob delete failed:", err)
+      );
+      if (e.id) {
+        const rec = await redis
+          .get<ScanRecord>(`${SCAN_KEY_PREFIX}${e.id}`)
+          .catch(() => null);
+        if (rec?.photoUrl) {
+          del(rec.photoUrl, { token }).catch(() => {});
+        }
+        await redis.del(`${SCAN_KEY_PREFIX}${e.id}`).catch(() => {});
+      }
+    }
 
-  return Response.json({ ok: true, entry });
+    return Response.json({ ok: true, entry });
+  } catch (err) {
+    console.error("gallery save failed:", err);
+    // Don't leave orphaned blobs if we couldn't record the entry.
+    await Promise.all(
+      uploaded.map((u) => del(u, { token }).catch(() => {}))
+    );
+    return Response.json({ error: "Could not save scan" }, { status: 500 });
+  }
 }

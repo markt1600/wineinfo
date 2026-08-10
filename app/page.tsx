@@ -1,13 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import AnnotatedImage from "@/components/AnnotatedImage";
 import Gallery from "@/components/Gallery";
-import InfographicCard from "@/components/InfographicCard";
-import type { AnalysisResult, BottleResult } from "@/lib/schema";
-import { formatTotals, marketTotals } from "@/lib/totals";
+import ResultsView from "@/components/ResultsView";
+import type { AnalysisResult } from "@/lib/schema";
 
-const MAX_EDGE = 2576; // Fable 5's high-res vision limit (long edge)
+const MAX_EDGE = 2576; // Claude's high-res vision limit (long edge)
 const MAX_BASE64_BYTES = 3.6 * 1024 * 1024; // stay under serverless body limits
 
 const CURRENCIES = [
@@ -51,115 +49,6 @@ async function prepareImage(file: File): Promise<Prepared> {
     height,
     dataUrl,
   };
-}
-
-function money(m: { amount: number; currency: string } | null): string | null {
-  if (!m) return null;
-  if (m.currency === "UNK") return `${m.amount} (currency unconfirmed)`;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: m.currency,
-    }).format(m.amount);
-  } catch {
-    return `${m.amount} ${m.currency}`;
-  }
-}
-
-function BottleCard({
-  bottle,
-  isBest,
-}: {
-  bottle: BottleResult;
-  isBest: boolean;
-}) {
-  const name =
-    [bottle.producer, bottle.wineName, bottle.vintage]
-      .filter(Boolean)
-      .join(" ") ||
-    bottle.labelText ||
-    "Unknown bottle";
-
-  return (
-    <div className="bottle">
-      <h3>
-        <span style={{ color: "var(--muted)" }}>{bottle.id}</span> {name}{" "}
-        <span
-          className={`tag ${bottle.identified ? "identified" : "unidentified"}`}
-        >
-          {bottle.identified ? "Identified" : "Unidentified"}
-        </span>
-        {isBest && <span className="tag best">★ Best value</span>}
-      </h3>
-      <dl>
-        {bottle.region && (
-          <>
-            <dt>Region</dt>
-            <dd>{bottle.region}</dd>
-          </>
-        )}
-        {bottle.grapeVariety && (
-          <>
-            <dt>Grapes</dt>
-            <dd>{bottle.grapeVariety}</dd>
-          </>
-        )}
-        {bottle.wineType && (
-          <>
-            <dt>Type</dt>
-            <dd>{bottle.wineType}</dd>
-          </>
-        )}
-        {bottle.listedPrice && (
-          <>
-            <dt>Listed price</dt>
-            <dd>{money(bottle.listedPrice)}</dd>
-          </>
-        )}
-        {bottle.marketPrice && (
-          <>
-            <dt>Market price</dt>
-            <dd>
-              {money(bottle.marketPrice)}
-              {bottle.marketPriceSource && (
-                <span style={{ color: "var(--muted)" }}>
-                  {" "}
-                  ({bottle.marketPriceSource})
-                </span>
-              )}
-            </dd>
-          </>
-        )}
-        {bottle.ratings.map((r, i) => (
-          <RatingRow key={i} r={r} />
-        ))}
-        {bottle.valueAssessment && (
-          <>
-            <dt>Value</dt>
-            <dd>{bottle.valueAssessment}</dd>
-          </>
-        )}
-      </dl>
-      {bottle.notes && <p className="notes">{bottle.notes}</p>}
-    </div>
-  );
-}
-
-function RatingRow({ r }: { r: BottleResult["ratings"][number] }) {
-  const score = (
-    <>
-      {r.score}
-      {!r.vintageMatch && (
-        <span style={{ color: "var(--muted)" }}> (different/any vintage)</span>
-      )}
-    </>
-  );
-  return (
-    <>
-      <dt>{r.source}</dt>
-      <dd>{r.url ? <a href={r.url} target="_blank" rel="noreferrer">{score}</a> : score}</dd>
-    </>
-  );
 }
 
 export default function Home() {
@@ -243,7 +132,36 @@ export default function Home() {
   };
 
   const needsCurrency = !!result?.currency.needsUserInput;
-  const bestValueId = result?.bestValue.bottleId ?? null;
+
+  const currencyCard = needsCurrency ? (
+    <div className="card">
+      <p style={{ marginBottom: 4 }}>
+        💱 I found prices but couldn&apos;t determine the currency. What
+        currency are these prices in?
+      </p>
+      <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+        {result?.currency.reasoning}
+      </p>
+      <select
+        className="currency"
+        value={currencyPick}
+        onChange={(e) => setCurrencyPick(e.target.value)}
+      >
+        {CURRENCIES.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      <button
+        className="btn"
+        disabled={busy}
+        onClick={() => prepared && analyze(prepared, currencyPick)}
+      >
+        Re-analyze with {currencyPick}
+      </button>
+    </div>
+  ) : null;
 
   return (
     <main>
@@ -299,102 +217,19 @@ export default function Home() {
         {error && <div className="error">{error}</div>}
       </div>
 
-      {prepared && !result && !busy && !error && (
-        <div className="card preview">
-          <img src={prepared.dataUrl} alt="Your photo" />
-        </div>
-      )}
-
-      {prepared && busy && (
+      {prepared && !result && (
         <div className="card preview">
           <img src={prepared.dataUrl} alt="Your photo" />
         </div>
       )}
 
       {result && prepared && (
-        <>
-          <div className="card">
-            <AnnotatedImage
-              imageDataUrl={prepared.dataUrl}
-              result={result}
-              bestValueId={bestValueId}
-            />
-          </div>
-
-          {needsCurrency && (
-            <div className="card">
-              <p style={{ marginBottom: 4 }}>
-                💱 I found prices but couldn&apos;t determine the currency.
-                What currency are these prices in?
-              </p>
-              <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                {result.currency.reasoning}
-              </p>
-              <select
-                className="currency"
-                value={currencyPick}
-                onChange={(e) => setCurrencyPick(e.target.value)}
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn"
-                disabled={busy}
-                onClick={() => prepared && analyze(prepared, currencyPick)}
-              >
-                Re-analyze with {currencyPick}
-              </button>
-            </div>
-          )}
-
-          <div className="card">
-            <p className="summary">{result.summary}</p>
-            {bestValueId && (
-              <div className="best-banner">
-                <strong>★ Best value: {bestValueId}</strong> —{" "}
-                {result.bestValue.reasoning}
-              </div>
-            )}
-            {formatTotals(marketTotals(result)) && (
-              <div className="best-banner" style={{ borderColor: "var(--border)" }}>
-                <strong style={{ color: "var(--text)" }}>
-                  Total value at market price:
-                </strong>{" "}
-                {formatTotals(marketTotals(result))}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            {result.bottles.map((b) => (
-              <BottleCard key={b.id} bottle={b} isBest={b.id === bestValueId} />
-            ))}
-            {result.bottles.length === 0 && (
-              <p style={{ color: "var(--muted)" }}>
-                No wine bottles or menu entries were found in this photo.
-              </p>
-            )}
-          </div>
-
-          {result.bottles.length > 0 && (
-            <div className="card">
-              <h2 style={{ fontSize: "1.1rem", marginBottom: 12 }}>
-                📱 Shareable summary
-              </h2>
-              <InfographicCard
-                key={prepared.dataUrl}
-                imageDataUrl={prepared.dataUrl}
-                result={result}
-                bestValueId={bestValueId}
-                onSaved={() => setGalleryRefresh((n) => n + 1)}
-              />
-            </div>
-          )}
-        </>
+        <ResultsView
+          imageDataUrl={prepared.dataUrl}
+          result={result}
+          afterImage={currencyCard}
+          onSaved={() => setGalleryRefresh((n) => n + 1)}
+        />
       )}
 
       <Gallery refreshKey={galleryRefresh} limit={5} showViewAll />

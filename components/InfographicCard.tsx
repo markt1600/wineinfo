@@ -16,6 +16,7 @@ interface Props {
   imageDataUrl: string;
   result: AnalysisResult;
   bestValueId: string | null;
+  autoSave?: boolean; // false when replaying an already-saved scan
   onSaved?: () => void;
 }
 
@@ -87,10 +88,36 @@ function roundRectPath(
   }
 }
 
+// Re-encode the analyzed photo (same pixel size, so bounding boxes stay
+// valid) down to a size the gallery API accepts.
+function compressPhoto(srcDataUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const cctx = c.getContext("2d");
+      if (!cctx) return resolve(null);
+      cctx.drawImage(img, 0, 0);
+      let q = 0.72;
+      let out = c.toDataURL("image/jpeg", q);
+      while (out.length > 1.9 * 1024 * 1024 && q > 0.35) {
+        q -= 0.1;
+        out = c.toDataURL("image/jpeg", q);
+      }
+      resolve(out.length <= 2.4 * 1024 * 1024 ? out : null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = srcDataUrl;
+  });
+}
+
 export default function InfographicCard({
   imageDataUrl,
   result,
   bestValueId,
+  autoSave = true,
   onSaved,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -99,8 +126,8 @@ export default function InfographicCard({
     "pending"
   );
 
-  // Automatically save the rendered card to the shared history.
-  const autoSave = async (canvas: HTMLCanvasElement) => {
+  // Automatically save the card + photo + full analysis to shared history.
+  const doSave = async (canvas: HTMLCanvasElement) => {
     if (savedRef.current) return;
     savedRef.current = true;
     try {
@@ -110,11 +137,14 @@ export default function InfographicCard({
         quality -= 0.1;
         dataUrl = canvas.toDataURL("image/jpeg", quality);
       }
+      const photo = await compressPhoto(imageDataUrl);
       const res = await fetch("/api/gallery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image: dataUrl.split(",")[1],
+          photo: photo?.split(",")[1],
+          result,
           caption: buildCaption(result),
           sceneType: result.sceneType,
         }),
@@ -135,6 +165,9 @@ export default function InfographicCard({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const img = new Image();
+    // Blob-hosted photos (replay view) are cross-origin; load with CORS so
+    // the canvas isn't tainted and downloads keep working.
+    if (!imageDataUrl.startsWith("data:")) img.crossOrigin = "anonymous";
     img.onload = () => {
       canvas.width = W;
       canvas.height = H;
@@ -314,11 +347,11 @@ export default function InfographicCard({
       const foot = "* rating from a different/any vintage · made with Wine (a)ID";
       ctx.fillText(foot, PAD, H - 32);
 
-      void autoSave(canvas);
+      if (autoSave) void doSave(canvas);
     };
     img.src = imageDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageDataUrl, result, bestValueId]);
+  }, [imageDataUrl, result, bestValueId, autoSave]);
 
   const download = () => {
     const canvas = canvasRef.current;

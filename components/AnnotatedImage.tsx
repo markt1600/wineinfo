@@ -23,6 +23,9 @@ export default function AnnotatedImage({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const img = new Image();
+    // Blob-hosted photos (replay view) are cross-origin; without CORS the
+    // canvas would be tainted and the download button would break.
+    if (!imageDataUrl.startsWith("data:")) img.crossOrigin = "anonymous";
     img.onload = () => {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
