@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // with their blobs and records deleted.
 const LIST_KEY = "gallery:entries";
 const SCAN_KEY_PREFIX = "scan:";
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 20;
 const MAX_CARD_BYTES = 1.5 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 2.2 * 1024 * 1024;
 

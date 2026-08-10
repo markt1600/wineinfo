@@ -67,9 +67,10 @@ test the camera flow).
    With both Blob and Redis connected, every analyzed summary card is saved
    automatically: the home page shows the last 5 ("Recent scans", captioned
    with the wine names and total market value), and `/gallery` lists all prior
-   cards. History is capped at the newest 200 cards — older ones are trimmed
-   and their images deleted, keeping storage under ~100 MB. Note that saved
-   cards are visible to everyone using your deployment.
+   cards with a full replay of the original analysis. History is capped at the
+   newest 20 scans — older ones are trimmed and their images and analysis
+   records deleted, keeping storage under ~30 MB. Note that saved cards are
+   visible to everyone using your deployment.
 5. **Enable the wine database:** in the Vercel dashboard, go to your project's
    **Storage** tab → **Create Database** → choose **Upstash for Redis** (Vercel
    Marketplace) and connect it to the project. That injects the
