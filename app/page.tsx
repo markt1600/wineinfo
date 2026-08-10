@@ -160,7 +160,8 @@ function RatingRow({ r }: { r: BottleResult["ratings"][number] }) {
 }
 
 export default function Home() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -252,11 +253,20 @@ export default function Home() {
         </p>
       </header>
 
+      {/* capture="environment" opens the camera directly on phones… */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
+        hidden
+        onChange={onFile}
+      />
+      {/* …no capture attribute lets the user pick from their photo library */}
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
         hidden
         onChange={onFile}
       />
@@ -265,9 +275,16 @@ export default function Home() {
         <button
           className="btn"
           disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => cameraInputRef.current?.click()}
         >
           📷 {prepared ? "Take another photo" : "Take a photo"}
+        </button>
+        <button
+          className="btn secondary"
+          disabled={busy}
+          onClick={() => libraryInputRef.current?.click()}
+        >
+          🖼️ Choose from library
         </button>
         {busy && (
           <div className="status">
