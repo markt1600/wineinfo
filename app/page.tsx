@@ -148,16 +148,10 @@ export default function Home() {
   };
 
   const needsCurrency = !!result?.currency.needsUserInput;
+  const hasListedPrices = !!result?.bottles.some((b) => b.listedPrice);
 
-  const currencyCard = needsCurrency ? (
-    <div className="card">
-      <p style={{ marginBottom: 4 }}>
-        💱 I found prices but couldn&apos;t determine the currency. What
-        currency are these prices in?
-      </p>
-      <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-        {result?.currency.reasoning}
-      </p>
+  const currencyPicker = (
+    <>
       <select
         className="currency"
         value={currencyPick}
@@ -176,6 +170,41 @@ export default function Home() {
       >
         Re-analyze with {currencyPick}
       </button>
+    </>
+  );
+
+  // Always be transparent about the currency: ask when it couldn't be
+  // determined, otherwise state the assumption with a one-tap override.
+  const currencyCard = !result || !hasListedPrices ? null : needsCurrency ? (
+    <div className="card">
+      <p style={{ marginBottom: 4 }}>
+        💱 I found prices but couldn&apos;t determine the currency. What
+        currency are these prices in?
+      </p>
+      <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+        {result.currency.reasoning}
+      </p>
+      {currencyPicker}
+    </div>
+  ) : result.currency.code ? (
+    <div className="card">
+      <p style={{ fontSize: "0.9rem", color: "var(--muted)" }}>
+        💱 Prices interpreted as{" "}
+        <strong style={{ color: "var(--text)" }}>{result.currency.code}</strong>
+        {result.currency.reasoning && ` — ${result.currency.reasoning}`}
+      </p>
+      <details style={{ marginTop: 8 }}>
+        <summary
+          style={{
+            color: "var(--accent)",
+            fontSize: "0.88rem",
+            cursor: "pointer",
+          }}
+        >
+          Wrong currency? Change it
+        </summary>
+        {currencyPicker}
+      </details>
     </div>
   ) : null;
 
