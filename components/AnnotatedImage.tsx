@@ -57,7 +57,7 @@ export default function AnnotatedImage({
           <span className="dot red" /> Not identified
         </span>
         {bestValueId && (
-          <span style={{ color: "#f0c46c" }}>★ Best value</span>
+          <span style={{ color: "var(--gold)" }}>★ Best value</span>
         )}
       </div>
       <button className="btn secondary" onClick={download} style={{ marginTop: 12 }}>
