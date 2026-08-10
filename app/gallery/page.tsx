@@ -8,7 +8,7 @@ export default function GalleryPage() {
     <main>
       <header className="app">
         <h1>
-          🍷 Wine <span>Lens</span>
+          🍷 Wine <span>(a)ID</span>
         </h1>
         <p>All previously scanned summary cards.</p>
       </header>

@@ -249,7 +249,7 @@ export default function Home() {
     <main>
       <header className="app">
         <h1>
-          🍷 Wine <span>Lens</span>
+          🍷 Wine <span>(a)ID</span>
         </h1>
         <p>
           Snap a bottle, a shelf, or a wine menu. Get identifications, prices,

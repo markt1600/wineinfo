@@ -39,7 +39,7 @@ export default function AnnotatedImage({
     if (!canvas) return;
     const a = document.createElement("a");
     a.href = canvas.toDataURL("image/jpeg", 0.92);
-    a.download = "wine-lens-annotated.jpg";
+    a.download = "wine-aid-annotated.jpg";
     a.click();
   };
 

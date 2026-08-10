@@ -1,4 +1,4 @@
-# 🍷 Wine Lens
+# 🍷 Wine (a)ID
 
 A mobile-first web app for identifying wine from photos. Snap a picture with
 your phone of:

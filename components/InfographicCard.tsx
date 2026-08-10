@@ -150,7 +150,7 @@ export default function InfographicCard({
       // Header
       ctx.fillStyle = "#f5e9ec";
       ctx.font = "bold 64px sans-serif";
-      ctx.fillText("🍷 Wine Lens", PAD, PAD + 58);
+      ctx.fillText("🍷 Wine (a)ID", PAD, PAD + 58);
       ctx.font = "34px sans-serif";
       ctx.fillStyle = "#c9a3ad";
       const date = new Date().toLocaleDateString(undefined, {
@@ -311,7 +311,7 @@ export default function InfographicCard({
       // Footer
       ctx.font = "26px sans-serif";
       ctx.fillStyle = "rgba(201, 163, 173, 0.6)";
-      const foot = "* rating from a different/any vintage · made with Wine Lens";
+      const foot = "* rating from a different/any vintage · made with Wine (a)ID";
       ctx.fillText(foot, PAD, H - 32);
 
       void autoSave(canvas);
@@ -325,7 +325,7 @@ export default function InfographicCard({
     if (!canvas) return;
     const a = document.createElement("a");
     a.href = canvas.toDataURL("image/jpeg", 0.92);
-    a.download = "wine-lens-summary.jpg";
+    a.download = "wine-aid-summary.jpg";
     a.click();
   };
 
