@@ -1,5 +1,13 @@
 import { del, put } from "@vercel/blob";
 import { getRedis } from "@/lib/redis";
+import {
+  LIST_KEY,
+  SCAN_KEY_PREFIX,
+  galleryEnabled,
+  getBlobToken,
+  type GalleryEntry,
+  type ScanRecord,
+} from "@/lib/galleryStore";
 import type { AnalysisResult } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -10,47 +18,11 @@ export const dynamic = "force-dynamic";
 // result JSON goes to Redis (scan:<id>), and a capped Redis list holds
 // the feed metadata (newest first). Entries past the cap are trimmed
 // with their blobs and records deleted.
-const LIST_KEY = "gallery:entries";
-const SCAN_KEY_PREFIX = "scan:";
 const MAX_ENTRIES = 20;
 const MAX_CARD_BYTES = 1.5 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 2.2 * 1024 * 1024;
 
-export interface GalleryEntry {
-  id?: string; // scan record key suffix (absent on legacy entries)
-  url: string; // summary card image
-  caption: string;
-  sceneType: string;
-  at: string; // ISO timestamp
-}
-
-export interface ScanRecord {
-  id: string;
-  cardUrl: string;
-  photoUrl: string; // the analyzed photo (same pixel size as analysis)
-  caption: string;
-  sceneType: string;
-  at: string;
-  result: AnalysisResult;
-}
-
-// Vercel injects BLOB_READ_WRITE_TOKEN by default, but a store connected
-// with a custom env prefix names it <Prefix>_READ_WRITE_TOKEN. This
-// deployment's public store uses the "thirdblob" prefix — prefer it, so
-// leftover tokens from older (private) stores can never shadow it.
-function getBlobToken(): string | undefined {
-  if (process.env.thirdblob_READ_WRITE_TOKEN)
-    return process.env.thirdblob_READ_WRITE_TOKEN;
-  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
-  for (const [key, value] of Object.entries(process.env)) {
-    if (key.endsWith("_READ_WRITE_TOKEN") && value) return value;
-  }
-  return undefined;
-}
-
-function galleryEnabled(): boolean {
-  return getRedis() !== null && !!getBlobToken();
-}
+export type { GalleryEntry, ScanRecord };
 
 export async function GET(request: Request) {
   const storage = {
@@ -137,11 +109,13 @@ export async function POST(request: Request) {
     const at = new Date().toISOString();
     const caption = (body.caption ?? "").slice(0, 220);
     const sceneType = body.sceneType ?? "other";
-    const entry: GalleryEntry = { id, url: card.url, caption, sceneType, at };
 
     const redis = getRedis()!;
     // Full record for the replay view, when the client sent the analysis.
-    if (body.result && photoUrl) {
+    // The entry only carries an id when the record actually exists —
+    // otherwise the gallery would link to a replay that 404s.
+    const hasRecord = !!(body.result && photoUrl);
+    if (hasRecord) {
       const record: ScanRecord = {
         id,
         cardUrl: card.url,
@@ -149,10 +123,17 @@ export async function POST(request: Request) {
         caption,
         sceneType,
         at,
-        result: body.result,
+        result: body.result!,
       };
       await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
     }
+    const entry: GalleryEntry = {
+      ...(hasRecord ? { id } : {}),
+      url: card.url,
+      caption,
+      sceneType,
+      at,
+    };
 
     await redis.lpush(LIST_KEY, entry);
     // Trim the feed and fully delete anything that falls off the end.

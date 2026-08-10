@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import Gallery from "@/components/Gallery";
 import ResultsView from "@/components/ResultsView";
 import type { AnalysisResult } from "@/lib/schema";
@@ -233,6 +234,10 @@ export default function Home() {
       )}
 
       <Gallery refreshKey={galleryRefresh} limit={5} showViewAll />
+
+      <p className="footer-links">
+        <Link href="/admin">Admin</Link>
+      </p>
     </main>
   );
 }

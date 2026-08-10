@@ -20,6 +20,13 @@ interface AnalyzeRequest {
   currencyHint?: string; // ISO 4217 code confirmed by the user
 }
 
+// Per-photo research budget: at most this many wines get web research,
+// regardless of how many bottles are in the photo.
+const MAX_RESEARCH = Math.max(
+  1,
+  Number(process.env.ANALYSIS_MAX_WINES) || 15
+);
+
 function buildPrompt(req: AnalyzeRequest, withCache: boolean): string {
   const currencyNote = req.currencyHint
     ? `The user has confirmed that any prices shown in this photo are in ${req.currencyHint}. Use that currency for all listed prices and value comparisons; set currency.code to "${req.currencyHint}", detected to true, and needsUserInput to false.`
@@ -52,6 +59,8 @@ For each IDENTIFIED wine, use web search to find:
 - Typical current retail market price (prefer Wine-Searcher average or comparable aggregate; note the source).
 - Ratings: STRONGLY prefer Vivino and CellarTracker community scores — try to find at least one of those two for every identified wine. Only fall back to critic scores (Wine Spectator, Wine Advocate, etc.) when neither Vivino nor CellarTracker has a rating for the wine. Prefer the rating for the EXACT vintage shown in the photo; if no rating exists for that vintage, the wine's general (all-vintage) rating or a nearby vintage's rating is acceptable — set vintageMatch=false on such ratings and true only when the rating matches the pictured vintage. Include the source name and score; include a URL when you have one.
 Be economical with research: at most ONE web search per identified wine — a single query like "<producer> <wine> <vintage> price rating" usually returns the market price and a Vivino/CellarTracker score together in the result snippets. Use web_fetch only when the snippets genuinely don't contain the number you need. Never search for unidentified bottles, and don't re-verify data you already have.
+
+Research budget: research at most ${MAX_RESEARCH} wines in this photo. If more are identified, prioritize (1) wines with listed prices (needed for the value comparison), (2) the most prominent bottles, (3) likely best-value candidates. For identified wines beyond the budget, set marketPrice to null and ratings to [] and note "not researched — photo has many bottles" in their notes. If the photo shows more than 30 bottles or menu lines, include the 30 most legible as entries and mention the remainder in the summary.
 
 Prices and value:
 - listedPrice: the price printed in the photo for that bottle/menu line, if any.
@@ -204,8 +213,14 @@ export async function POST(request: Request) {
           },
         ];
 
+        // Hard API-level ceilings — even a 100-bottle photo cannot exceed
+        // these regardless of what the model decides.
         const tools: unknown[] = [
-          { type: "web_search_20260209", name: "web_search", max_uses: 8 },
+          {
+            type: "web_search_20260209",
+            name: "web_search",
+            max_uses: MAX_RESEARCH,
+          },
           {
             type: "web_fetch_20260209",
             name: "web_fetch",

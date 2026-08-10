@@ -40,11 +40,23 @@ function ScanView() {
         if (!cancelled) setRecord(data.record as ScanRecord);
       })
       .catch((e) => {
-        if (!cancelled) setError(e?.message || "Could not load this scan.");
+        if (cancelled) return;
+        // No full record (older save) — fall back to the plain card viewer.
+        const src = params.get("src");
+        if (src) {
+          const caption = params.get("caption") ?? "";
+          const at = params.get("at") ?? "";
+          router.replace(
+            `/card?src=${encodeURIComponent(src)}&caption=${encodeURIComponent(caption)}&at=${encodeURIComponent(at)}`
+          );
+          return;
+        }
+        setError(e?.message || "Could not load this scan.");
       });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const back = () => {

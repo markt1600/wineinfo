@@ -12,11 +12,13 @@ interface GalleryEntry {
 }
 
 // Full replay when the analysis was saved; legacy entries fall back to the
-// plain image viewer.
+// plain image viewer. The /scan link carries the card params too, so the
+// replay page can fall back to the image viewer if the record is gone.
 function entryHref(e: GalleryEntry): string {
+  const cardParams = `src=${encodeURIComponent(e.url)}&caption=${encodeURIComponent(e.caption)}&at=${encodeURIComponent(e.at)}`;
   return e.id
-    ? `/scan?id=${encodeURIComponent(e.id)}`
-    : `/card?src=${encodeURIComponent(e.url)}&caption=${encodeURIComponent(e.caption)}&at=${encodeURIComponent(e.at)}`;
+    ? `/scan?id=${encodeURIComponent(e.id)}&${cardParams}`
+    : `/card?${cardParams}`;
 }
 
 interface Props {

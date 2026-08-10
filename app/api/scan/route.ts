@@ -1,5 +1,5 @@
 import { getRedis } from "@/lib/redis";
-import type { ScanRecord } from "@/app/api/gallery/route";
+import type { ScanRecord } from "@/lib/galleryStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
