@@ -63,6 +63,19 @@ export async function POST(request: Request) {
     const keep = all.filter((e) => !urls.has(e.url));
     const remove = all.filter((e) => urls.has(e.url));
 
+    // Orphaned cards (in Blob storage but not in the Redis feed) can be
+    // selected in the admin UI too — delete their blobs directly.
+    const inList = new Set(all.map((e) => e.url));
+    let orphansDeleted = 0;
+    for (const url of urls) {
+      if (!inList.has(url) && url.includes(".blob.vercel-storage.com")) {
+        orphansDeleted++;
+        del(url, { token }).catch((err) =>
+          console.error("admin orphan delete failed:", err)
+        );
+      }
+    }
+
     for (const e of remove) {
       del(e.url, { token }).catch((err) =>
         console.error("admin blob delete failed:", err)
@@ -82,7 +95,11 @@ export async function POST(request: Request) {
     if (keep.length > 0) pipeline.rpush(LIST_KEY, ...keep);
     await pipeline.exec();
 
-    return Response.json({ ok: true, deleted: remove.length, remaining: keep.length });
+    return Response.json({
+      ok: true,
+      deleted: remove.length + orphansDeleted,
+      remaining: keep.length,
+    });
   }
 
   return Response.json({ error: "Unknown action" }, { status: 400 });

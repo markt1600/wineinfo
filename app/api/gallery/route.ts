@@ -1,4 +1,4 @@
-import { del, put } from "@vercel/blob";
+import { del, list, put } from "@vercel/blob";
 import { getRedis } from "@/lib/redis";
 import {
   LIST_KEY,
@@ -45,11 +45,45 @@ export async function GET(request: Request) {
       Math.max(1, Number(limitParam) || MAX_ENTRIES)
     );
     const redis = getRedis()!;
-    const [entries, total] = await Promise.all([
-      redis.lrange<GalleryEntry>(LIST_KEY, 0, limit - 1),
-      redis.llen(LIST_KEY),
-    ]);
-    return Response.json({ enabled: true, storage, entries, total });
+    const entries = await redis.lrange<GalleryEntry>(LIST_KEY, 0, -1);
+
+    // Self-heal: also surface card images that exist in Blob storage but
+    // are missing from the Redis feed (older saves, or a recreated
+    // database). They render without captions and open as plain cards.
+    let merged = entries;
+    try {
+      const { blobs } = await list({
+        prefix: "gallery/",
+        token: getBlobToken(),
+      });
+      const known = new Set(entries.map((e) => e.url));
+      const orphans: GalleryEntry[] = blobs
+        .filter(
+          (b) =>
+            // card images only — skip the archived photos
+            (b.pathname.includes("-card") ||
+              b.pathname.startsWith("gallery/card-")) &&
+            !known.has(b.url)
+        )
+        .map((b) => ({
+          url: b.url,
+          caption: "",
+          sceneType: "other",
+          at: new Date(b.uploadedAt).toISOString(),
+        }));
+      merged = [...entries, ...orphans].sort((a, b) =>
+        a.at < b.at ? 1 : -1
+      );
+    } catch (err) {
+      console.error("gallery blob listing failed:", err);
+    }
+
+    return Response.json({
+      enabled: true,
+      storage,
+      entries: merged.slice(0, limit),
+      total: merged.length,
+    });
   } catch (err) {
     console.error("gallery list failed:", err);
     return Response.json({ enabled: false, storage, entries: [], total: 0 });
