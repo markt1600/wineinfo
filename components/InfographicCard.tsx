@@ -16,7 +16,25 @@ interface Props {
   imageDataUrl: string;
   result: AnalysisResult;
   bestValueId: string | null;
-  onShared?: () => void;
+  onSaved?: () => void;
+}
+
+// "Opus One 2019, Caymus 2021 +2 more · $412 at market"
+function buildCaption(result: AnalysisResult): string {
+  const names = result.bottles
+    .filter((b) => b.identified)
+    .map((b) =>
+      [b.producer, b.wineName, b.vintage].filter(Boolean).join(" ")
+    )
+    .filter(Boolean);
+  const shown = names.slice(0, 3);
+  const more = names.length - shown.length;
+  const nameStr =
+    shown.length > 0
+      ? shown.join(", ") + (more > 0 ? ` +${more} more` : "")
+      : `${result.bottles.length} wine${result.bottles.length === 1 ? "" : "s"}`;
+  const totalStr = formatTotals(marketTotals(result));
+  return totalStr ? `${nameStr} · ${totalStr} at market` : nameStr;
 }
 
 function truncate(
@@ -73,12 +91,45 @@ export default function InfographicCard({
   imageDataUrl,
   result,
   bestValueId,
-  onShared,
+  onSaved,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [shareState, setShareState] = useState<
-    "idle" | "sharing" | "shared" | "failed"
-  >("idle");
+  const savedRef = useRef(false);
+  const [saveState, setSaveState] = useState<"pending" | "saved" | "off">(
+    "pending"
+  );
+
+  // Automatically save the rendered card to the shared history.
+  const autoSave = async (canvas: HTMLCanvasElement) => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+    try {
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL("image/jpeg", quality);
+      while (dataUrl.length > 1.4 * 1024 * 1024 && quality > 0.4) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+      const res = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: dataUrl.split(",")[1],
+          caption: buildCaption(result),
+          sceneType: result.sceneType,
+        }),
+      });
+      if (res.ok) {
+        setSaveState("saved");
+        onSaved?.();
+      } else {
+        // 503 = gallery storage not configured; anything else, don't retry.
+        setSaveState("off");
+      }
+    } catch {
+      setSaveState("off");
+    }
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -260,8 +311,11 @@ export default function InfographicCard({
       ctx.fillStyle = "rgba(201, 163, 173, 0.6)";
       const foot = "* rating from a different/any vintage · made with Wine Lens";
       ctx.fillText(foot, PAD, H - 32);
+
+      void autoSave(canvas);
     };
     img.src = imageDataUrl;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageDataUrl, result, bestValueId]);
 
   const download = () => {
@@ -273,57 +327,24 @@ export default function InfographicCard({
     a.click();
   };
 
-  const share = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || shareState === "sharing" || shareState === "shared") return;
-    setShareState("sharing");
-    try {
-      // Step quality down until the upload fits the gallery size cap.
-      let quality = 0.8;
-      let dataUrl = canvas.toDataURL("image/jpeg", quality);
-      while (dataUrl.length > 1.4 * 1024 * 1024 && quality > 0.4) {
-        quality -= 0.1;
-        dataUrl = canvas.toDataURL("image/jpeg", quality);
-      }
-      const totalStr = formatTotals(marketTotals(result));
-      const n = result.bottles.length;
-      const caption = totalStr
-        ? `${n} wine${n === 1 ? "" : "s"} · ${totalStr} at market`
-        : `${n} wine${n === 1 ? "" : "s"}`;
-      const res = await fetch("/api/gallery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: dataUrl.split(",")[1],
-          caption,
-          sceneType: result.sceneType,
-        }),
-      });
-      if (!res.ok) throw new Error(`share failed (${res.status})`);
-      setShareState("shared");
-      onShared?.();
-    } catch (err) {
-      console.error(err);
-      setShareState("failed");
-    }
-  };
-
   return (
     <div className="preview">
       <canvas ref={canvasRef} style={{ width: "100%", height: "auto" }} />
       <button className="btn" onClick={download} style={{ marginTop: 12 }}>
         Download summary card
       </button>
-      <button
-        className="btn secondary"
-        onClick={share}
-        disabled={shareState === "sharing" || shareState === "shared"}
-      >
-        {shareState === "idle" && "🌍 Share to public gallery"}
-        {shareState === "sharing" && "Sharing…"}
-        {shareState === "shared" && "✓ Shared to gallery"}
-        {shareState === "failed" && "Share failed — tap to retry"}
-      </button>
+      {saveState === "saved" && (
+        <p
+          style={{
+            color: "var(--muted)",
+            fontSize: "0.82rem",
+            marginTop: 8,
+            textAlign: "center",
+          }}
+        >
+          ✓ Saved to recent scans
+        </p>
+      )}
     </div>
   );
 }

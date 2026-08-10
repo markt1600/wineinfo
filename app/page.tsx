@@ -390,14 +390,14 @@ export default function Home() {
                 imageDataUrl={prepared.dataUrl}
                 result={result}
                 bestValueId={bestValueId}
-                onShared={() => setGalleryRefresh((n) => n + 1)}
+                onSaved={() => setGalleryRefresh((n) => n + 1)}
               />
             </div>
           )}
         </>
       )}
 
-      <Gallery refreshKey={galleryRefresh} />
+      <Gallery refreshKey={galleryRefresh} limit={5} showViewAll />
     </main>
   );
 }
