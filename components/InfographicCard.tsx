@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
-import { renderAnnotatedCanvas } from "@/lib/annotate";
 import { formatMoney, formatTotals, marketTotals } from "@/lib/totals";
 
 // Phone-sized (9:16) shareable infographic: annotated photo on top, a
@@ -204,20 +203,22 @@ export default function InfographicCard({
         PAD + 110
       );
 
-      // Annotated photo, letterboxed into a rounded frame
+      // The original (un-annotated) photo, letterboxed into a rounded frame
       const photoTop = PAD + 150;
       const photoH = 620;
       const photoW = W - PAD * 2;
-      const annotated = renderAnnotatedCanvas(img, result, bestValueId);
-      const s = Math.min(photoW / annotated.width, photoH / annotated.height);
-      const dw = annotated.width * s;
-      const dh = annotated.height * s;
+      const s = Math.min(
+        photoW / img.naturalWidth,
+        photoH / img.naturalHeight
+      );
+      const dw = img.naturalWidth * s;
+      const dh = img.naturalHeight * s;
       const dx = PAD + (photoW - dw) / 2;
       const dy = photoTop + (photoH - dh) / 2;
       ctx.save();
       roundRectPath(ctx, dx, dy, dw, dh, 24);
       ctx.clip();
-      ctx.drawImage(annotated, dx, dy, dw, dh);
+      ctx.drawImage(img, dx, dy, dw, dh);
       ctx.restore();
       ctx.strokeStyle = "#57202c";
       ctx.lineWidth = 3;
