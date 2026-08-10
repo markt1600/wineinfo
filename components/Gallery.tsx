@@ -111,11 +111,9 @@ export default function Gallery({
       </p>
       <div className="gallery-grid">
         {entries.map((e) => (
-          <a
+          <Link
             key={e.url}
-            href={e.url}
-            target="_blank"
-            rel="noreferrer"
+            href={`/card?src=${encodeURIComponent(e.url)}&caption=${encodeURIComponent(e.caption)}&at=${encodeURIComponent(e.at)}`}
             className="gallery-item"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -129,7 +127,7 @@ export default function Gallery({
                 })}
               </em>
             </span>
-          </a>
+          </Link>
         ))}
       </div>
       {showViewAll && total > entries.length && (
