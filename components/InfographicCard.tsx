@@ -191,11 +191,33 @@ export default function InfographicCard({
       roundRectPath(ctx, dx, dy, dw, dh, 24);
       ctx.stroke();
 
-      // Totals bar geometry (drawn after list, but reserve space now)
+      // Totals bar directly under the photo
       const totalsH = 140;
       const footerH = 54;
-      const listTop = photoTop + photoH + 40;
-      const listBottom = H - totalsH - footerH - 36;
+      const totals = marketTotals(result);
+      const totalStr = formatTotals(totals);
+      const barY = photoTop + photoH + 28;
+      ctx.fillStyle = "rgba(240, 196, 108, 0.10)";
+      roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
+      ctx.fill();
+      ctx.strokeStyle = "#f0c46c";
+      ctx.lineWidth = 2;
+      roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
+      ctx.stroke();
+      ctx.font = "34px sans-serif";
+      ctx.fillStyle = "#c9a3ad";
+      ctx.fillText("Total value at market price", PAD + 36, barY + 56);
+      ctx.font = "bold 58px sans-serif";
+      ctx.fillStyle = "#f0c46c";
+      ctx.fillText(
+        totalStr ?? "n/a — no market prices found",
+        PAD + 36,
+        barY + 118
+      );
+
+      // Wine list fills the space between the totals bar and the footer
+      const listTop = barY + totalsH + 36;
+      const listBottom = H - footerH - 24;
 
       // Wine list
       const bottles = result.bottles;
@@ -230,7 +252,7 @@ export default function InfographicCard({
         ctx.fillStyle = isBest ? "#f0c46c" : "#f5e9ec";
         const star = isBest ? "★ " : "";
         ctx.fillText(
-          truncate(ctx, `${star}${b.id} · ${bottleName(b)}`, nameMaxW),
+          truncate(ctx, `${star}${bottleName(b)}`, nameMaxW),
           textX,
           y + rowH / 2 - 8
         );
@@ -282,29 +304,6 @@ export default function InfographicCard({
         ctx.fillStyle = "#c9a3ad";
         ctx.fillText(`+ ${overflow} more wine${overflow > 1 ? "s" : ""}`, PAD + 48, y + rowH / 2);
       }
-
-      // Totals bar
-      const totals = marketTotals(result);
-      const totalStr = formatTotals(totals);
-      const barY = H - totalsH - footerH;
-      ctx.fillStyle = "rgba(240, 196, 108, 0.10)";
-      roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
-      ctx.fill();
-      ctx.strokeStyle = "#f0c46c";
-      ctx.lineWidth = 2;
-      roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
-      ctx.stroke();
-
-      ctx.font = "34px sans-serif";
-      ctx.fillStyle = "#c9a3ad";
-      ctx.fillText("Total value at market price", PAD + 36, barY + 56);
-      ctx.font = "bold 58px sans-serif";
-      ctx.fillStyle = "#f0c46c";
-      ctx.fillText(
-        totalStr ?? "n/a — no market prices found",
-        PAD + 36,
-        barY + 118
-      );
 
       // Footer
       ctx.font = "26px sans-serif";
