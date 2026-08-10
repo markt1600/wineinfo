@@ -19,19 +19,30 @@ export interface GalleryEntry {
   at: string; // ISO timestamp
 }
 
+// Vercel injects BLOB_READ_WRITE_TOKEN by default, but a store connected
+// with a custom env prefix names it <Prefix>_READ_WRITE_TOKEN — accept any.
+function getBlobToken(): string | undefined {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.endsWith("_READ_WRITE_TOKEN") && value) return value;
+  }
+  return undefined;
+}
+
 function galleryEnabled(): boolean {
-  return getRedis() !== null && !!process.env.BLOB_READ_WRITE_TOKEN;
+  return getRedis() !== null && !!getBlobToken();
 }
 
 export async function GET(request: Request) {
   const storage = {
     redis: getRedis() !== null,
-    blob: !!process.env.BLOB_READ_WRITE_TOKEN,
-    // BLOB_STORE_ID without a read-write token means a PRIVATE blob store
-    // is connected — this app needs a PUBLIC one (gallery images are
-    // served by direct URL).
+    blob: !!getBlobToken(),
+    // A store id without any read-write token means only a PRIVATE blob
+    // store is connected — this app needs a PUBLIC one (gallery images
+    // are served by direct URL).
     privateBlobStore:
-      !process.env.BLOB_READ_WRITE_TOKEN && !!process.env.BLOB_STORE_ID,
+      !getBlobToken() &&
+      Object.keys(process.env).some((k) => k.endsWith("_STORE_ID")),
   };
   if (!storage.redis || !storage.blob) {
     return Response.json({ enabled: false, storage, entries: [], total: 0 });
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
     access: "public",
     contentType: "image/jpeg",
     addRandomSuffix: true,
+    token: getBlobToken(),
   });
 
   const entry: GalleryEntry = {
@@ -94,7 +106,7 @@ export async function POST(request: Request) {
     await redis.ltrim(LIST_KEY, 0, MAX_ENTRIES - 1);
     await Promise.all(
       evicted.map((e) =>
-        del(e.url).catch((err) =>
+        del(e.url, { token: getBlobToken() }).catch((err) =>
           console.error("gallery blob delete failed:", err)
         )
       )
@@ -102,7 +114,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("gallery push failed:", err);
     // Don't leave an orphaned blob if we couldn't record it.
-    await del(blob.url).catch(() => {});
+    await del(blob.url, { token: getBlobToken() }).catch(() => {});
     return Response.json({ error: "Could not save to gallery" }, { status: 500 });
   }
 
