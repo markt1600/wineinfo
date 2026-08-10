@@ -30,7 +30,7 @@ const MAX_RESEARCH = Math.max(
 function buildPrompt(req: AnalyzeRequest, withCache: boolean): string {
   const currencyNote = req.currencyHint
     ? `The user has confirmed that any prices shown in this photo are in ${req.currencyHint}. Use that currency for all listed prices and value comparisons; set currency.code to "${req.currencyHint}", detected to true, and needsUserInput to false.`
-    : `If the photo shows prices (shelf tags or a menu), determine the currency from symbols, language, formatting, and any location clues. If you cannot determine it with reasonable confidence, set currency.needsUserInput to true, leave listedPrice amounts as the printed numbers with currency "UNK", and do NOT make value-for-money judgements — explain in the summary that the currency must be confirmed first.`;
+    : `If the photo shows prices (shelf tags or a menu), determine the currency from symbols, language, formatting, and any location clues (tax wording like "KDV" implies Turkey/TRY, "TVA" France/EUR, etc.). Beware ambiguous symbols: a bare "$" could be USD, CAD, AUD, NZD, SGD and more — treat the currency as unknown unless the language, retailer branding, tax notes, price formatting, or other context pins down the country. When the currency is not reasonably certain, set currency.needsUserInput to true, leave listedPrice amounts as the printed numbers with currency "UNK", and do NOT make value-for-money judgements — explain in the summary that the currency must be confirmed first.`;
 
   const cacheNote = withCache
     ? `
@@ -49,10 +49,12 @@ First classify the scene:
 - wine_menu: a printed or written wine list / menu
 - other: not wine related
 
-For every wine bottle (or menu line item) you can see, create an entry in "bottles":
+For every DISTINCT wine you can see (bottle or menu line item), create ONE entry in "bottles":
+- One entry per distinct wine, not per physical bottle: shelves often hold several identical bottles of the same wine (multiple facings). Box the clearest bottle for that wine, and when there are multiple facings mention the count in notes (e.g. "3 facings on shelf"). Never research the same wine more than once.
 - Give it a short id ("b1", "b2", ...).
 - boundingBox: the pixel coordinates of the bottle (or the menu line) in the submitted image, top-left origin. Coordinates map 1:1 to the image pixels. Provide a box for every entry you can locate visually; use null only if you truly cannot localize it.
 - Read the label or menu text carefully (producer, cuvée, vintage, appellation).
+- PRICE TAGS ARE A FIRST-CLASS IDENTIFICATION SOURCE: in stores, shelf price tags usually print the wine's name, size, and price — often more legibly than the bottle. When a bottle is lying down, angled, or its label is unreadable, identify the wine from the price tag nearest to it (tags normally sit directly below or beside their bottles — match by position). Combine tag text with whatever is visible on the bottle. The tag is also the authoritative source for listedPrice.
 - Set identified=true only when you are reasonably confident of the specific wine (producer + wine). Partial reads where the wine cannot be pinned down are identified=false.
 ${cacheNote}
 For each IDENTIFIED wine, use web search to find:
