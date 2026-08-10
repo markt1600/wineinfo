@@ -29,9 +29,11 @@ export default function Gallery({
   const [entries, setEntries] = useState<GalleryEntry[] | null>(null);
   const [total, setTotal] = useState(0);
   const [enabled, setEnabled] = useState(true);
-  const [storage, setStorage] = useState<{ redis: boolean; blob: boolean } | null>(
-    null
-  );
+  const [storage, setStorage] = useState<{
+    redis: boolean;
+    blob: boolean;
+    privateBlobStore?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,10 +69,23 @@ export default function Gallery({
       <div className="card">
         <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>{title}</h2>
         <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-          ⚠️ Scan history is off — this deployment is missing{" "}
-          {missing || "storage configuration"}. In Vercel, open the project's
-          <strong> Storage</strong> tab, create/connect it, then redeploy.
-          Scans made before storage is connected are not saved.
+          {storage?.privateBlobStore ? (
+            <>
+              ⚠️ Scan history is off — the connected Blob store is{" "}
+              <strong>Private</strong>, but this app needs a{" "}
+              <strong>Public</strong> one (gallery images are served by URL).
+              In Vercel&apos;s Storage tab, create a new Blob store with
+              Public access, connect it to this project, then redeploy.
+            </>
+          ) : (
+            <>
+              ⚠️ Scan history is off — this deployment is missing{" "}
+              {missing || "storage configuration"}. In Vercel, open the
+              project&apos;s <strong>Storage</strong> tab, create/connect it,
+              then redeploy. Scans made before storage is connected are not
+              saved.
+            </>
+          )}
         </p>
       </div>
     );

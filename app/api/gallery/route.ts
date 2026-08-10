@@ -27,6 +27,11 @@ export async function GET(request: Request) {
   const storage = {
     redis: getRedis() !== null,
     blob: !!process.env.BLOB_READ_WRITE_TOKEN,
+    // BLOB_STORE_ID without a read-write token means a PRIVATE blob store
+    // is connected — this app needs a PUBLIC one (gallery images are
+    // served by direct URL).
+    privateBlobStore:
+      !process.env.BLOB_READ_WRITE_TOKEN && !!process.env.BLOB_STORE_ID,
   };
   if (!storage.redis || !storage.blob) {
     return Response.json({ enabled: false, storage, entries: [], total: 0 });
