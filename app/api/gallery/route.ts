@@ -20,8 +20,12 @@ export interface GalleryEntry {
 }
 
 // Vercel injects BLOB_READ_WRITE_TOKEN by default, but a store connected
-// with a custom env prefix names it <Prefix>_READ_WRITE_TOKEN — accept any.
+// with a custom env prefix names it <Prefix>_READ_WRITE_TOKEN. This
+// deployment's public store uses the "thirdblob" prefix — prefer it, so
+// leftover tokens from older (private) stores can never shadow it.
 function getBlobToken(): string | undefined {
+  if (process.env.thirdblob_READ_WRITE_TOKEN)
+    return process.env.thirdblob_READ_WRITE_TOKEN;
   if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
   for (const [key, value] of Object.entries(process.env)) {
     if (key.endsWith("_READ_WRITE_TOKEN") && value) return value;
