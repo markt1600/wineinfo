@@ -64,12 +64,16 @@ export default function Home() {
   const [galleryRefresh, setGalleryRefresh] = useState(0);
   const [awaitingConfirm, setAwaitingConfirm] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  // Set when the pre-check found prices but couldn't pin down the currency —
+  // holds the model's reasoning; the user answers before research starts.
+  const [currencyRequest, setCurrencyRequest] = useState<string | null>(null);
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
     setError(null);
     setResult(null);
     setAwaitingConfirm(false);
+    setCurrencyRequest(null);
     setProgress(0);
     setStatus("Uploading photo…");
     try {
@@ -104,7 +108,11 @@ export default function Home() {
           const msg = JSON.parse(line.slice(6));
           if (msg.type === "status") setStatus(msg.message);
           else if (msg.type === "progress") setProgress(msg.pct);
-          else if (msg.type === "result") {
+          else if (msg.type === "needs_currency") {
+            setCurrencyRequest(msg.reasoning ?? "");
+            setStatus(null);
+            setProgress(null);
+          } else if (msg.type === "result") {
             setResult(msg.data as AnalysisResult);
             setStatus(null);
             setProgress(null);
@@ -145,12 +153,13 @@ export default function Home() {
   const cancelPhoto = () => {
     setPrepared(null);
     setAwaitingConfirm(false);
+    setCurrencyRequest(null);
   };
 
   const needsCurrency = !!result?.currency.needsUserInput;
   const hasListedPrices = !!result?.bottles.some((b) => b.listedPrice);
 
-  const currencyPicker = (
+  const currencyPicker = (label: string) => (
     <>
       <select
         className="currency"
@@ -168,7 +177,7 @@ export default function Home() {
         disabled={busy}
         onClick={() => prepared && analyze(prepared, currencyPick)}
       >
-        Re-analyze with {currencyPick}
+        {label} {currencyPick}
       </button>
     </>
   );
@@ -184,7 +193,7 @@ export default function Home() {
       <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
         {result.currency.reasoning}
       </p>
-      {currencyPicker}
+      {currencyPicker("Re-analyze with")}
     </div>
   ) : result.currency.code ? (
     <div className="card">
@@ -203,7 +212,7 @@ export default function Home() {
         >
           Wrong currency? Change it
         </summary>
-        {currencyPicker}
+        {currencyPicker("Re-analyze with")}
       </details>
     </div>
   ) : null;
@@ -276,6 +285,24 @@ export default function Home() {
         )}
         {error && <div className="error">{error}</div>}
       </div>
+
+      {prepared && currencyRequest !== null && !result && !busy && (
+        <div className="card">
+          <p style={{ marginBottom: 4 }}>
+            💱 This photo shows prices, but the currency isn&apos;t obvious.
+            What currency are they in?
+          </p>
+          {currencyRequest && (
+            <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+              {currencyRequest}
+            </p>
+          )}
+          {currencyPicker("Start analysis with")}
+          <button className="btn secondary" onClick={cancelPhoto}>
+            ✖️ Cancel
+          </button>
+        </div>
+      )}
 
       {prepared && !result && (
         <div className="card preview">

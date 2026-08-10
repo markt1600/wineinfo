@@ -35,7 +35,8 @@ function buildPrompt(req: AnalyzeRequest, withCache: boolean): string {
   const cacheNote = withCache
     ? `
 Wine database (cache):
-- This app keeps a local database of wines it has already researched. After identifying the wines in the photo and BEFORE any web searching, call the wine_cache_lookup tool ONCE with ALL identified wines.
+- This app keeps a local database of wines it has already researched. After identifying the wines in the photo and BEFORE any web searching, you MUST call the wine_cache_lookup tool ONCE with ALL identified wines. Never start web searching without checking the cache first.
+- When calling wine_cache_lookup, pass the producer and wine name exactly as printed on the label or price tag — do not expand, translate, or canonicalize them. Repeat scans of the same label must generate the same lookup.
 - For cache hits, use the cached market price and ratings directly and do NOT web-search that wine (append " (cached)" to marketPriceSource). Cached data is at most 30 days old.
 - Only web-search the wines that were cache misses.`
     : "";
@@ -103,6 +104,44 @@ const cacheLookupTool = {
   },
 } as const;
 
+// Quick pre-analysis check: is this a priced scene, and is the currency
+// obvious? Runs without search tools at low effort, so it costs ~a cent —
+// far cheaper than discovering mid-research that the user must be asked.
+const precheckSchema = {
+  type: "object",
+  properties: {
+    sceneType: {
+      type: "string",
+      enum: [
+        "single_bottle",
+        "bottle_group",
+        "shelf_with_prices",
+        "wine_menu",
+        "other",
+      ],
+    },
+    hasVisiblePrices: { type: "boolean" },
+    currencyCode: { type: ["string", "null"] },
+    currencyConfident: { type: "boolean" },
+    reasoning: { type: "string" },
+  },
+  required: [
+    "sceneType",
+    "hasVisiblePrices",
+    "currencyCode",
+    "currencyConfident",
+    "reasoning",
+  ],
+  additionalProperties: false,
+} as const;
+
+const PRECHECK_PROMPT = `Quickly examine this photo of wine. Do NOT research anything — just answer:
+- sceneType: single_bottle | bottle_group | shelf_with_prices | wine_menu | other
+- hasVisiblePrices: are prices visible (shelf tags or menu prices)?
+- currencyCode + currencyConfident: if prices are visible, which ISO 4217 currency are they in, and is that determination confident? A bare "$" is ambiguous (USD, CAD, AUD, NZD, SGD…) — be confident only when language, tax wording (KDV→TRY, TVA→EUR…), distinctive symbols (₺, €, £, ¥), price formatting, or other context pins down the country.
+- reasoning: one short sentence explaining the currency determination.
+Respond with a single JSON object only.`;
+
 interface CacheLookupInput {
   wines: {
     id: string;
@@ -125,37 +164,53 @@ function extractJson(text: string): AnalysisResult {
   }
 }
 
-// Store freshly researched wines; entries that came from the cache keep
-// their original timestamp by being skipped (their keys are in hitKeys).
-async function writeBackCache(data: AnalysisResult, hitKeys: Set<string>) {
+// Store freshly researched wines. Each entry is written under BOTH the
+// canonical key (post-research names) AND the key the model used when it
+// looked the wine up pre-research (as-printed label names) — repeat scans
+// of the same photo regenerate the lookup key, so that alias is what makes
+// cache hits actually happen. Wines that came from the cache are skipped
+// so they keep their original research timestamp.
+async function writeBackCache(
+  data: AnalysisResult,
+  hitKeys: Set<string>,
+  lookupKeyByBottleId: Map<string, string>
+) {
   if (!cacheEnabled()) return;
   const now = new Date().toISOString();
-  await Promise.all(
-    data.bottles
-      .filter(
-        (b) =>
-          b.identified &&
-          (b.producer || b.wineName) &&
-          (b.marketPrice || b.ratings.length > 0)
-      )
-      .map((b) => {
-        const key = wineKey(b.producer, b.wineName, b.vintage);
-        if (hitKeys.has(key)) return Promise.resolve();
-        const entry: WineCacheEntry = {
-          producer: b.producer,
-          wineName: b.wineName,
-          vintage: b.vintage,
-          region: b.region,
-          grapeVariety: b.grapeVariety,
-          wineType: b.wineType,
-          marketPrice: b.marketPrice,
-          marketPriceSource: b.marketPriceSource?.replace(/ \(cached\)$/i, "") ?? null,
-          ratings: b.ratings,
-          fetchedAt: now,
-        };
-        return cacheSet(key, entry);
-      })
-  );
+  const writes: Promise<void>[] = [];
+  let written = 0;
+  for (const b of data.bottles) {
+    if (
+      !b.identified ||
+      (!b.producer && !b.wineName) ||
+      (!b.marketPrice && b.ratings.length === 0)
+    )
+      continue;
+    const canonicalKey = wineKey(b.producer, b.wineName, b.vintage);
+    const lookupKey = lookupKeyByBottleId.get(b.id);
+    const keys = [...new Set([canonicalKey, lookupKey].filter(Boolean))] as string[];
+    // A hit on any of its keys means this bottle's data came from the
+    // cache — don't rewrite (would refresh the timestamp on stale data).
+    if (keys.some((k) => hitKeys.has(k))) continue;
+    const entry: WineCacheEntry = {
+      producer: b.producer,
+      wineName: b.wineName,
+      vintage: b.vintage,
+      region: b.region,
+      grapeVariety: b.grapeVariety,
+      wineType: b.wineType,
+      marketPrice: b.marketPrice,
+      marketPriceSource: b.marketPriceSource?.replace(/ \(cached\)$/i, "") ?? null,
+      ratings: b.ratings,
+      fetchedAt: now,
+    };
+    for (const k of keys) {
+      written++;
+      writes.push(cacheSet(k, entry));
+    }
+  }
+  await Promise.all(writes);
+  console.log(`wine cache: wrote ${written} keys`);
 }
 
 export async function POST(request: Request) {
@@ -183,6 +238,9 @@ export async function POST(request: Request) {
         const client = new Anthropic();
         const withCache = cacheEnabled();
         const cacheHitKeys = new Set<string>();
+        // bottle id → the cache key the model looked it up under, so the
+        // write-back can alias researched data to the as-printed name too.
+        const lookupKeysByBottleId = new Map<string, string>();
 
         // Cost controls: Sonnet 5 at medium effort is near-Opus on this
         // workload at a fraction of the price. Override via env if needed.
@@ -192,18 +250,62 @@ export async function POST(request: Request) {
         const useFallbacks =
           MODEL.startsWith("claude-opus-5") || MODEL.startsWith("claude-fable-5");
 
+        const imageBlock = {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: body.mediaType,
+            data: body.image,
+          },
+        } as const;
+
+        // Currency pre-check: when no hint was provided, look at the photo
+        // cheaply first. If it's a priced scene with an unclear currency,
+        // ask the user BEFORE spending anything on research.
+        if (!body.currencyHint) {
+          send({ type: "status", message: "Checking for prices and currency…" });
+          send({ type: "progress", pct: 3 });
+          try {
+            const pre = await (client.beta.messages.create as any)({
+              model: MODEL,
+              max_tokens: 1000,
+              output_config: {
+                effort: "low",
+                format: { type: "json_schema", schema: precheckSchema },
+              },
+              messages: [
+                {
+                  role: "user",
+                  content: [imageBlock, { type: "text", text: PRECHECK_PROMPT }],
+                },
+              ],
+            });
+            if (pre.stop_reason !== "refusal") {
+              const preText = pre.content
+                .filter((b: any) => b.type === "text")
+                .map((b: any) => b.text)
+                .join("");
+              const info = JSON.parse(preText);
+              if (info.hasVisiblePrices && !info.currencyConfident) {
+                send({
+                  type: "needs_currency",
+                  reasoning: info.reasoning ?? "",
+                });
+                return; // client asks the user, then re-calls with the hint
+              }
+            }
+          } catch (err) {
+            // Pre-check is best-effort — on any failure just run the full
+            // analysis, which still handles unknown currencies safely.
+            console.error("currency precheck failed:", err);
+          }
+        }
+
         const messages: Anthropic.Beta.BetaMessageParam[] = [
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: body.mediaType,
-                  data: body.image,
-                },
-              },
+              imageBlock,
               {
                 type: "text",
                 text: buildPrompt(body, withCache),
@@ -367,6 +469,9 @@ export async function POST(request: Request) {
                   w,
                   key: wineKey(w.producer, w.wineName, w.vintage),
                 }));
+                for (const { w, key } of keyByWine) {
+                  lookupKeysByBottleId.set(w.id, key);
+                }
                 const found = await cacheGetMany(keyByWine.map((k) => k.key));
                 const results = keyByWine.map(({ w, key }) => {
                   const entry = found.get(key);
@@ -426,7 +531,7 @@ export async function POST(request: Request) {
         send({ type: "progress", pct: 100 });
         send({ type: "result", data });
 
-        await writeBackCache(data, cacheHitKeys);
+        await writeBackCache(data, cacheHitKeys, lookupKeysByBottleId);
       } catch (err: any) {
         console.error("analyze failed:", err);
         send({
