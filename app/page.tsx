@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react";
 import AnnotatedImage from "@/components/AnnotatedImage";
+import InfographicCard from "@/components/InfographicCard";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
+import { formatTotals, marketTotals } from "@/lib/totals";
 
 const MAX_EDGE = 2576; // Fable 5's high-res vision limit (long edge)
 const MAX_BASE64_BYTES = 3.6 * 1024 * 1024; // stay under serverless body limits
@@ -355,6 +357,14 @@ export default function Home() {
                 {result.bestValue.reasoning}
               </div>
             )}
+            {formatTotals(marketTotals(result)) && (
+              <div className="best-banner" style={{ borderColor: "var(--border)" }}>
+                <strong style={{ color: "var(--text)" }}>
+                  Total value at market price:
+                </strong>{" "}
+                {formatTotals(marketTotals(result))}
+              </div>
+            )}
           </div>
 
           <div className="card">
@@ -367,6 +377,19 @@ export default function Home() {
               </p>
             )}
           </div>
+
+          {result.bottles.length > 0 && (
+            <div className="card">
+              <h2 style={{ fontSize: "1.1rem", marginBottom: 12 }}>
+                📱 Shareable summary
+              </h2>
+              <InfographicCard
+                imageDataUrl={prepared.dataUrl}
+                result={result}
+                bestValueId={bestValueId}
+              />
+            </div>
+          )}
         </>
       )}
     </main>
