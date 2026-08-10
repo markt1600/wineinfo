@@ -34,6 +34,13 @@ gold. You can download the annotated image.
   research-heavy request can take a few minutes.
 - Server-side refusal fallbacks are enabled, so a false-positive safety decline
   is transparently re-served by Anthropic's recommended fallback model.
+- **Wine database (optional but recommended):** previously researched wines
+  (market price, source, ratings, variety, region, vintage) are cached in Redis
+  for 30 days. Before web-searching, the model calls a `wine_cache_lookup` tool
+  with every wine it identified; cache hits skip web searching entirely, which
+  makes repeat lookups faster and much cheaper. Freshly researched wines are
+  written back automatically. Without Redis configured, the app works normally
+  and just searches every time.
 
 ## Setup
 
@@ -54,6 +61,13 @@ test the camera flow).
 3. The analyze route sets `maxDuration = 300`; make sure your Vercel plan (or
    Fluid Compute setting) allows function durations up to 300 s, since
    web-search-heavy analyses of a full shelf can take a couple of minutes.
+4. **Enable the wine database:** in the Vercel dashboard, go to your project's
+   **Storage** tab → **Create Database** → choose **Upstash for Redis** (Vercel
+   Marketplace) and connect it to the project. That injects the
+   `KV_REST_API_URL` / `KV_REST_API_TOKEN` environment variables the app looks
+   for, and the cache turns on automatically on the next deploy. (A Redis
+   database created directly at upstash.com works too — set
+   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.)
 
 ## Notes
 

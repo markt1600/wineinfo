@@ -1,7 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { analysisJsonSchema, type AnalysisResult } from "@/lib/schema";
+import {
+  cacheEnabled,
+  cacheGetMany,
+  cacheSet,
+  wineKey,
+  type WineCacheEntry,
+} from "@/lib/wineCache";
 
-// Web-search-heavy Fable 5 turns can run for minutes; give the function room.
+// Web-search-heavy turns can run for minutes; give the function room.
 export const maxDuration = 300;
 export const runtime = "nodejs";
 
@@ -13,10 +20,18 @@ interface AnalyzeRequest {
   currencyHint?: string; // ISO 4217 code confirmed by the user
 }
 
-function buildPrompt(req: AnalyzeRequest): string {
+function buildPrompt(req: AnalyzeRequest, withCache: boolean): string {
   const currencyNote = req.currencyHint
     ? `The user has confirmed that any prices shown in this photo are in ${req.currencyHint}. Use that currency for all listed prices and value comparisons; set currency.code to "${req.currencyHint}", detected to true, and needsUserInput to false.`
     : `If the photo shows prices (shelf tags or a menu), determine the currency from symbols, language, formatting, and any location clues. If you cannot determine it with reasonable confidence, set currency.needsUserInput to true, leave listedPrice amounts as the printed numbers with currency "UNK", and do NOT make value-for-money judgements — explain in the summary that the currency must be confirmed first.`;
+
+  const cacheNote = withCache
+    ? `
+Wine database (cache):
+- This app keeps a local database of wines it has already researched. After identifying the wines in the photo and BEFORE any web searching, call the wine_cache_lookup tool ONCE with ALL identified wines.
+- For cache hits, use the cached market price and ratings directly and do NOT web-search that wine (append " (cached)" to marketPriceSource). Cached data is at most 30 days old.
+- Only web-search the wines that were cache misses.`
+    : "";
 
   return `You are a wine identification and valuation assistant. Analyze the attached photo (${req.width}x${req.height} pixels).
 
@@ -32,7 +47,7 @@ For every wine bottle (or menu line item) you can see, create an entry in "bottl
 - boundingBox: the pixel coordinates of the bottle (or the menu line) in the submitted image, top-left origin. Coordinates map 1:1 to the image pixels. Provide a box for every entry you can locate visually; use null only if you truly cannot localize it.
 - Read the label or menu text carefully (producer, cuvée, vintage, appellation).
 - Set identified=true only when you are reasonably confident of the specific wine (producer + wine). Partial reads where the wine cannot be pinned down are identified=false.
-
+${cacheNote}
 For each IDENTIFIED wine, use web search to find:
 - Typical current retail market price (prefer Wine-Searcher average or comparable aggregate; note the source).
 - Ratings: STRONGLY prefer Vivino and CellarTracker community scores — try to find at least one of those two for every identified wine. Only fall back to critic scores (Wine Spectator, Wine Advocate, etc.) when neither Vivino nor CellarTracker has a rating for the wine. Prefer the rating for the EXACT vintage shown in the photo; if no rating exists for that vintage, the wine's general (all-vintage) rating or a nearby vintage's rating is acceptable — set vintageMatch=false on such ratings and true only when the rating matches the pictured vintage. Include the source name and score; include a URL when you have one.
@@ -49,6 +64,43 @@ Finish with a concise, friendly summary (2-4 sentences) of what you found.
 Your final answer must be a single JSON object matching the required schema — no prose outside the JSON.`;
 }
 
+const cacheLookupTool = {
+  name: "wine_cache_lookup",
+  description:
+    "Look up wines in the app's local database of previously researched wines. Call this ONCE, with every identified wine, before doing any web searching. Wines returned as cached already have market price and ratings — do not web-search those.",
+  input_schema: {
+    type: "object",
+    properties: {
+      wines: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "The bottle id you assigned (b1, b2, ...)",
+            },
+            producer: { type: ["string", "null"] },
+            wineName: { type: ["string", "null"] },
+            vintage: { type: ["string", "null"] },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    required: ["wines"],
+  },
+} as const;
+
+interface CacheLookupInput {
+  wines: {
+    id: string;
+    producer?: string | null;
+    wineName?: string | null;
+    vintage?: string | null;
+  }[];
+}
+
 function extractJson(text: string): AnalysisResult {
   try {
     return JSON.parse(text) as AnalysisResult;
@@ -60,6 +112,39 @@ function extractJson(text: string): AnalysisResult {
     }
     throw new Error("Model response did not contain valid JSON");
   }
+}
+
+// Store freshly researched wines; entries that came from the cache keep
+// their original timestamp by being skipped (their keys are in hitKeys).
+async function writeBackCache(data: AnalysisResult, hitKeys: Set<string>) {
+  if (!cacheEnabled()) return;
+  const now = new Date().toISOString();
+  await Promise.all(
+    data.bottles
+      .filter(
+        (b) =>
+          b.identified &&
+          (b.producer || b.wineName) &&
+          (b.marketPrice || b.ratings.length > 0)
+      )
+      .map((b) => {
+        const key = wineKey(b.producer, b.wineName, b.vintage);
+        if (hitKeys.has(key)) return Promise.resolve();
+        const entry: WineCacheEntry = {
+          producer: b.producer,
+          wineName: b.wineName,
+          vintage: b.vintage,
+          region: b.region,
+          grapeVariety: b.grapeVariety,
+          wineType: b.wineType,
+          marketPrice: b.marketPrice,
+          marketPriceSource: b.marketPriceSource?.replace(/ \(cached\)$/i, "") ?? null,
+          ratings: b.ratings,
+          fetchedAt: now,
+        };
+        return cacheSet(key, entry);
+      })
+  );
 }
 
 export async function POST(request: Request) {
@@ -85,8 +170,10 @@ export async function POST(request: Request) {
 
       try {
         const client = new Anthropic();
+        const withCache = cacheEnabled();
+        const cacheHitKeys = new Set<string>();
 
-        let messages: Anthropic.Beta.BetaMessageParam[] = [
+        const messages: Anthropic.Beta.BetaMessageParam[] = [
           {
             role: "user",
             content: [
@@ -98,15 +185,16 @@ export async function POST(request: Request) {
                   data: body.image,
                 },
               },
-              { type: "text", text: buildPrompt(body) },
+              { type: "text", text: buildPrompt(body, withCache) },
             ],
           },
         ];
 
-        const tools = [
+        const tools: unknown[] = [
           { type: "web_search_20260209", name: "web_search", max_uses: 20 },
           { type: "web_fetch_20260209", name: "web_fetch", max_uses: 10 },
         ];
+        if (withCache) tools.push(cacheLookupTool);
 
         // Opus 5: omitting the thinking param runs adaptive thinking. Include
         // server-side refusal fallbacks by default so a benign false-positive
@@ -132,24 +220,29 @@ export async function POST(request: Request) {
         let useFormat = true;
         let final: Anthropic.Beta.BetaMessage | null = null;
 
-        // Server-tool loops can pause (stop_reason: pause_turn); resume by
-        // re-sending the conversation with the assistant turn appended.
-        for (let turn = 0; turn < 8 && !final; turn++) {
+        // The loop handles three continuation cases: pause_turn from the
+        // server-side search tools, tool_use for our cache-lookup tool, and
+        // a one-time retry without structured outputs.
+        for (let turn = 0; turn < 16 && !final; turn++) {
           let response: Anthropic.Beta.BetaMessage;
           try {
             const s = client.beta.messages.stream(makeParams(useFormat));
             s.on("streamEvent", (event: any) => {
-              if (
-                event.type === "content_block_start" &&
-                event.content_block?.type === "server_tool_use"
-              ) {
+              if (event.type !== "content_block_start") return;
+              const block = event.content_block;
+              if (block?.type === "server_tool_use") {
                 send({
                   type: "status",
                   message:
-                    event.content_block.name === "web_search"
+                    block.name === "web_search"
                       ? "Searching the web for prices and ratings…"
                       : "Reading a web page…",
                 });
+              } else if (
+                block?.type === "tool_use" &&
+                block.name === "wine_cache_lookup"
+              ) {
+                send({ type: "status", message: "Checking the wine database…" });
               }
             });
             response = await s.finalMessage();
@@ -171,13 +264,53 @@ export async function POST(request: Request) {
           }
 
           if (response.stop_reason === "pause_turn") {
-            messages = [
-              messages[0],
-              { role: "assistant", content: response.content },
-            ];
+            messages.push({ role: "assistant", content: response.content });
             send({ type: "status", message: "Still researching…" });
             continue;
           }
+
+          if (response.stop_reason === "tool_use") {
+            messages.push({ role: "assistant", content: response.content });
+            const toolResults: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+            for (const block of response.content) {
+              if (block.type !== "tool_use") continue;
+              if (block.name === "wine_cache_lookup") {
+                const input = block.input as CacheLookupInput;
+                const wines = Array.isArray(input?.wines) ? input.wines : [];
+                const keyByWine = wines.map((w) => ({
+                  w,
+                  key: wineKey(w.producer, w.wineName, w.vintage),
+                }));
+                const found = await cacheGetMany(keyByWine.map((k) => k.key));
+                const results = keyByWine.map(({ w, key }) => {
+                  const entry = found.get(key);
+                  if (entry) cacheHitKeys.add(key);
+                  return entry
+                    ? { id: w.id, cached: true, ...entry }
+                    : { id: w.id, cached: false };
+                });
+                send({
+                  type: "status",
+                  message: `Wine database: ${results.filter((r) => r.cached).length} of ${results.length} already known…`,
+                });
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: JSON.stringify({ results }),
+                });
+              } else {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: `Unknown tool: ${block.name}`,
+                  is_error: true,
+                });
+              }
+            }
+            messages.push({ role: "user", content: toolResults });
+            continue;
+          }
+
           final = response;
         }
 
@@ -201,6 +334,8 @@ export async function POST(request: Request) {
 
         const data = extractJson(text);
         send({ type: "result", data });
+
+        await writeBackCache(data, cacheHitKeys);
       } catch (err: any) {
         console.error("analyze failed:", err);
         send({
