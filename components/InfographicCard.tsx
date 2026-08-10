@@ -219,8 +219,11 @@ export default function InfographicCard({
       const listTop = barY + totalsH + 36;
       const listBottom = H - footerH - 24;
 
-      // Wine list
-      const bottles = result.bottles;
+      // Identified wines first (unidentified ones are also the first to be
+      // pushed into the "+N more" overflow); stable order within each group.
+      const bottles = [...result.bottles].sort(
+        (a, b) => Number(b.identified) - Number(a.identified)
+      );
       const minRowH = 96;
       const maxRows = Math.max(1, Math.floor((listBottom - listTop) / minRowH));
       const shown =
