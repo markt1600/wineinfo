@@ -22,11 +22,12 @@ gold. You can download the annotated image.
 - Next.js (App Router) frontend with a camera capture flow. Photos are
   downscaled client-side to Claude's high-resolution vision limit (2576 px long
   edge) so bounding-box coordinates map 1:1 to pixels.
-- `/api/analyze` calls **Claude Opus 5** (`claude-opus-5`) with the
-  server-side **web search** and **web fetch** tools, so the model researches
-  prices (Wine-Searcher etc.) and ratings (Vivino, CellarTracker) live. To use
-  Claude Fable 5 instead (higher capability, 2x the token price), change the
-  `model` string in `app/api/analyze/route.ts` to `claude-fable-5`.
+- `/api/analyze` calls **Claude Sonnet 5** (`claude-sonnet-5`, `medium`
+  effort) with the server-side **web search** and **web fetch** tools, so the
+  model researches prices (Wine-Searcher etc.) and ratings (Vivino,
+  CellarTracker) live. Model and effort are configurable via the
+  `ANALYSIS_MODEL` / `ANALYSIS_EFFORT` env vars (e.g. `claude-opus-5` + `high`
+  for maximum quality at a higher price).
 - Structured outputs (`output_config.format`) constrain the answer to a JSON
   schema including per-bottle pixel bounding boxes, prices, ratings, and a
   best-value verdict.
@@ -77,8 +78,21 @@ test the camera flow).
    database created directly at upstash.com works too — set
    `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.)
 
-## Notes
+## Cost controls
 
+Several measures keep per-photo Claude costs low (roughly $0.10–0.30 for a
+typical multi-bottle photo, less for a single bottle):
+
+- **Prompt caching** — every web-search round re-reads the photo, instructions,
+  and prior research from the cache at ~10% of the normal input price instead
+  of re-billing it in full.
+- **Sonnet 5 at medium effort** by default — near-Opus quality on this
+  workload at a fraction of the price. Raise via `ANALYSIS_MODEL` /
+  `ANALYSIS_EFFORT` if you want maximum quality.
+- **Search discipline** — the model is instructed to run at most one search
+  per identified wine; searches are capped at 8 and page fetches at 3 (max
+  6,000 tokens per fetched page).
+- **The Redis wine cache** — wines seen before skip web research entirely, so
+  repeat scans of the same shelf or list are the cheapest of all. Enable it
+  (see Deploy step 5) for the biggest ongoing savings.
 - The API key is only used server-side; the browser never sees it.
-- Cost scales with photo complexity — a large shelf photo triggers one or two
-  web searches per identified bottle.

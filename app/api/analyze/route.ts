@@ -51,7 +51,7 @@ ${cacheNote}
 For each IDENTIFIED wine, use web search to find:
 - Typical current retail market price (prefer Wine-Searcher average or comparable aggregate; note the source).
 - Ratings: STRONGLY prefer Vivino and CellarTracker community scores — try to find at least one of those two for every identified wine. Only fall back to critic scores (Wine Spectator, Wine Advocate, etc.) when neither Vivino nor CellarTracker has a rating for the wine. Prefer the rating for the EXACT vintage shown in the photo; if no rating exists for that vintage, the wine's general (all-vintage) rating or a nearby vintage's rating is acceptable — set vintageMatch=false on such ratings and true only when the rating matches the pictured vintage. Include the source name and score; include a URL when you have one.
-Search efficiently: one or two searches per identified wine is usually enough. For unidentified bottles, skip searching.
+Be economical with research: at most ONE web search per identified wine — a single query like "<producer> <wine> <vintage> price rating" usually returns the market price and a Vivino/CellarTracker score together in the result snippets. Use web_fetch only when the snippets genuinely don't contain the number you need. Never search for unidentified bottles, and don't re-verify data you already have.
 
 Prices and value:
 - listedPrice: the price printed in the photo for that bottle/menu line, if any.
@@ -173,6 +173,14 @@ export async function POST(request: Request) {
         const withCache = cacheEnabled();
         const cacheHitKeys = new Set<string>();
 
+        // Cost controls: Sonnet 5 at medium effort is near-Opus on this
+        // workload at a fraction of the price. Override via env if needed.
+        const MODEL = process.env.ANALYSIS_MODEL ?? "claude-sonnet-5";
+        const EFFORT = process.env.ANALYSIS_EFFORT ?? "medium";
+        // Server-side refusal fallbacks are an Opus 5 / Fable 5 feature.
+        const useFallbacks =
+          MODEL.startsWith("claude-opus-5") || MODEL.startsWith("claude-fable-5");
+
         const messages: Anthropic.Beta.BetaMessageParam[] = [
           {
             role: "user",
@@ -185,33 +193,48 @@ export async function POST(request: Request) {
                   data: body.image,
                 },
               },
-              { type: "text", text: buildPrompt(body, withCache) },
+              {
+                type: "text",
+                text: buildPrompt(body, withCache),
+                // Pin a cache breakpoint after the image + instructions so
+                // every search-round continuation re-reads them at ~10% cost.
+                cache_control: { type: "ephemeral" },
+              } as unknown as Anthropic.Beta.BetaTextBlockParam,
             ],
           },
         ];
 
         const tools: unknown[] = [
-          { type: "web_search_20260209", name: "web_search", max_uses: 20 },
-          { type: "web_fetch_20260209", name: "web_fetch", max_uses: 10 },
+          { type: "web_search_20260209", name: "web_search", max_uses: 8 },
+          {
+            type: "web_fetch_20260209",
+            name: "web_fetch",
+            max_uses: 3,
+            max_content_tokens: 6000,
+          },
         ];
         if (withCache) tools.push(cacheLookupTool);
 
-        // Opus 5: omitting the thinking param runs adaptive thinking. Include
-        // server-side refusal fallbacks by default so a benign false-positive
-        // safety decline is re-served by the recommended fallback model.
         const makeParams = (withFormat: boolean) =>
           ({
-            model: "claude-opus-5",
-            max_tokens: 64000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
+            model: MODEL,
+            max_tokens: 32000,
+            ...(useFallbacks
+              ? {
+                  betas: ["server-side-fallback-2026-07-01"],
+                  fallbacks: "default",
+                }
+              : {}),
             tools,
+            // Auto-cache the newest conversation tail so each continuation
+            // (search rounds, cache-tool round trips) reuses the prior prefix.
+            cache_control: { type: "ephemeral" },
             output_config: withFormat
               ? {
-                  effort: "high",
+                  effort: EFFORT,
                   format: { type: "json_schema", schema: analysisJsonSchema },
                 }
-              : { effort: "high" },
+              : { effort: EFFORT },
             messages,
           }) as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming;
 
