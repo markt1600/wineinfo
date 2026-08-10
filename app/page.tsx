@@ -62,11 +62,15 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [currencyPick, setCurrencyPick] = useState("USD");
   const [galleryRefresh, setGalleryRefresh] = useState(0);
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
     setError(null);
     setResult(null);
+    setAwaitingConfirm(false);
+    setProgress(0);
     setStatus("Uploading photo…");
     try {
       const res = await fetch("/api/analyze", {
@@ -99,12 +103,15 @@ export default function Home() {
           if (!line) continue;
           const msg = JSON.parse(line.slice(6));
           if (msg.type === "status") setStatus(msg.message);
+          else if (msg.type === "progress") setProgress(msg.pct);
           else if (msg.type === "result") {
             setResult(msg.data as AnalysisResult);
             setStatus(null);
+            setProgress(null);
           } else if (msg.type === "error") {
             setError(msg.message);
             setStatus(null);
+            setProgress(null);
           }
         }
       }
@@ -112,11 +119,14 @@ export default function Home() {
     } catch (e: any) {
       setError(e?.message || "Something went wrong.");
       setStatus(null);
+      setProgress(null);
     } finally {
       setBusy(false);
     }
   };
 
+  // Selecting a photo only shows a preview — analysis starts after the
+  // user confirms.
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -126,10 +136,15 @@ export default function Home() {
     try {
       const img = await prepareImage(file);
       setPrepared(img);
-      await analyze(img);
+      setAwaitingConfirm(true);
     } catch (err: any) {
       setError(err?.message || "Could not read that photo.");
     }
+  };
+
+  const cancelPhoto = () => {
+    setPrepared(null);
+    setAwaitingConfirm(false);
   };
 
   const needsCurrency = !!result?.currency.needsUserInput;
@@ -212,7 +227,22 @@ export default function Home() {
         {busy && (
           <div className="status">
             <div className="spinner" />
-            {status ?? "Working…"}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div>{status ?? "Working…"}</div>
+              {progress != null && (
+                <div className="progress-track">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            {progress != null && (
+              <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+                ~{progress}%
+              </span>
+            )}
           </div>
         )}
         {error && <div className="error">{error}</div>}
@@ -221,6 +251,20 @@ export default function Home() {
       {prepared && !result && (
         <div className="card preview">
           <img src={prepared.dataUrl} alt="Your photo" />
+          {awaitingConfirm && !busy && (
+            <>
+              <button
+                className="btn"
+                style={{ marginTop: 12 }}
+                onClick={() => analyze(prepared)}
+              >
+                ✅ Analyze this photo
+              </button>
+              <button className="btn secondary" onClick={cancelPhoto}>
+                ✖️ Cancel
+              </button>
+            </>
+          )}
         </div>
       )}
 

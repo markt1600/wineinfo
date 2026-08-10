@@ -254,6 +254,19 @@ export async function POST(request: Request) {
           }) as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming;
 
         send({ type: "status", message: "Looking at your photo…" });
+        send({ type: "progress", pct: 5 });
+
+        // Approximate progress: exact once the cache lookup reveals how many
+        // wines need research, heuristic before that.
+        let searchesDone = 0;
+        let expectedSearches: number | null = null;
+        const sendProgress = () => {
+          const pct =
+            expectedSearches && expectedSearches > 0
+              ? 20 + Math.min(1, searchesDone / expectedSearches) * 70
+              : Math.min(85, 15 + searchesDone * 10);
+          send({ type: "progress", pct: Math.round(pct) });
+        };
 
         let useFormat = true;
         let final: Anthropic.Beta.BetaMessage | null = null;
@@ -265,22 +278,55 @@ export async function POST(request: Request) {
           let response: Anthropic.Beta.BetaMessage;
           try {
             const s = client.beta.messages.stream(makeParams(useFormat));
+            // Accumulate each server tool call's streamed input so the
+            // status can say WHAT is being searched/read, not just that
+            // something is.
+            const toolBlocks = new Map<number, { name: string; json: string }>();
             s.on("streamEvent", (event: any) => {
-              if (event.type !== "content_block_start") return;
-              const block = event.content_block;
-              if (block?.type === "server_tool_use") {
-                send({
-                  type: "status",
-                  message:
-                    block.name === "web_search"
-                      ? "Searching the web for prices and ratings…"
-                      : "Reading a web page…",
-                });
+              if (event.type === "content_block_start") {
+                const block = event.content_block;
+                if (block?.type === "server_tool_use") {
+                  toolBlocks.set(event.index, { name: block.name, json: "" });
+                  if (block.name === "web_search") {
+                    searchesDone++;
+                    sendProgress();
+                    send({
+                      type: "status",
+                      message: "Searching the web for prices and ratings…",
+                    });
+                  } else {
+                    send({ type: "status", message: "Reading a web page…" });
+                  }
+                } else if (
+                  block?.type === "tool_use" &&
+                  block.name === "wine_cache_lookup"
+                ) {
+                  send({ type: "status", message: "Checking the wine database…" });
+                }
               } else if (
-                block?.type === "tool_use" &&
-                block.name === "wine_cache_lookup"
+                event.type === "content_block_delta" &&
+                event.delta?.type === "input_json_delta"
               ) {
-                send({ type: "status", message: "Checking the wine database…" });
+                const b = toolBlocks.get(event.index);
+                if (b) b.json += event.delta.partial_json ?? "";
+              } else if (event.type === "content_block_stop") {
+                const b = toolBlocks.get(event.index);
+                if (!b) return;
+                toolBlocks.delete(event.index);
+                try {
+                  const input = JSON.parse(b.json || "{}");
+                  if (b.name === "web_search" && input.query) {
+                    send({
+                      type: "status",
+                      message: `🔎 Researching: ${input.query}`,
+                    });
+                  } else if (b.name === "web_fetch" && input.url) {
+                    const host = new URL(input.url).hostname.replace(/^www\./, "");
+                    send({ type: "status", message: `📖 Reading ${host}…` });
+                  }
+                } catch {
+                  /* input still partial — skip the detailed status */
+                }
               }
             });
             response = await s.finalMessage();
@@ -327,6 +373,10 @@ export async function POST(request: Request) {
                     ? { id: w.id, cached: true, ...entry }
                     : { id: w.id, cached: false };
                 });
+                // Misses = wines still needing web research → progress
+                // estimates become accurate from here on.
+                expectedSearches = results.filter((r) => !r.cached).length;
+                sendProgress();
                 send({
                   type: "status",
                   message: `Wine database: ${results.filter((r) => r.cached).length} of ${results.length} already known…`,
@@ -371,6 +421,7 @@ export async function POST(request: Request) {
           .join("");
 
         const data = extractJson(text);
+        send({ type: "progress", pct: 100 });
         send({ type: "result", data });
 
         await writeBackCache(data, cacheHitKeys);
