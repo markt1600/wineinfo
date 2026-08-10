@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import AnnotatedImage from "@/components/AnnotatedImage";
+import Gallery from "@/components/Gallery";
 import InfographicCard from "@/components/InfographicCard";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
 import { formatTotals, marketTotals } from "@/lib/totals";
@@ -170,6 +171,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [currencyPick, setCurrencyPick] = useState("USD");
+  const [galleryRefresh, setGalleryRefresh] = useState(0);
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
@@ -384,14 +386,18 @@ export default function Home() {
                 📱 Shareable summary
               </h2>
               <InfographicCard
+                key={prepared.dataUrl}
                 imageDataUrl={prepared.dataUrl}
                 result={result}
                 bestValueId={bestValueId}
+                onShared={() => setGalleryRefresh((n) => n + 1)}
               />
             </div>
           )}
         </>
       )}
+
+      <Gallery refreshKey={galleryRefresh} />
     </main>
   );
 }

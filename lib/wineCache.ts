@@ -1,4 +1,4 @@
-import { Redis } from "@upstash/redis";
+import { getRedis } from "@/lib/redis";
 import type { Money, Rating } from "@/lib/schema";
 
 // A previously-researched wine, stored in Redis (Vercel's Upstash integration).
@@ -17,20 +17,6 @@ export interface WineCacheEntry {
 
 const KEY_PREFIX = "wine:";
 const TTL_SECONDS = 60 * 60 * 24 * 30; // prices/ratings go stale; 30 days
-
-let redis: Redis | null | undefined;
-
-function getRedis(): Redis | null {
-  if (redis !== undefined) return redis;
-  // Vercel's Upstash integration sets KV_* names; a direct Upstash setup
-  // sets UPSTASH_*. Support both; disable the cache when neither exists.
-  const url =
-    process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token =
-    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-  redis = url && token ? new Redis({ url, token }) : null;
-  return redis;
-}
 
 export function cacheEnabled(): boolean {
   return getRedis() !== null;

@@ -61,7 +61,15 @@ test the camera flow).
 3. The analyze route sets `maxDuration = 300`; make sure your Vercel plan (or
    Fluid Compute setting) allows function durations up to 300 s, since
    web-search-heavy analyses of a full shelf can take a couple of minutes.
-4. **Enable the wine database:** in the Vercel dashboard, go to your project's
+4. **Enable the public gallery (optional):** in the project's **Storage** tab,
+   also create a **Blob** store and connect it (this sets
+   `BLOB_READ_WRITE_TOKEN`). With both Blob and Redis connected, analyzed
+   summary cards get a "Share to public gallery" button, and the home page
+   shows the most recent 48 shared cards ("Recently scanned"). Older cards are
+   trimmed and their images deleted automatically, so gallery storage stays
+   under ~20 MB. Sharing is opt-in per scan — nothing is published
+   automatically.
+5. **Enable the wine database:** in the Vercel dashboard, go to your project's
    **Storage** tab → **Create Database** → choose **Upstash for Redis** (Vercel
    Marketplace) and connect it to the project. That injects the
    `KV_REST_API_URL` / `KV_REST_API_TOKEN` environment variables the app looks

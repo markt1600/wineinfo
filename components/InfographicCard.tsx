@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
 import { renderAnnotatedCanvas } from "@/lib/annotate";
 import { formatMoney, formatTotals, marketTotals } from "@/lib/totals";
@@ -16,6 +16,7 @@ interface Props {
   imageDataUrl: string;
   result: AnalysisResult;
   bestValueId: string | null;
+  onShared?: () => void;
 }
 
 function truncate(
@@ -72,8 +73,12 @@ export default function InfographicCard({
   imageDataUrl,
   result,
   bestValueId,
+  onShared,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [shareState, setShareState] = useState<
+    "idle" | "sharing" | "shared" | "failed"
+  >("idle");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -268,11 +273,56 @@ export default function InfographicCard({
     a.click();
   };
 
+  const share = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || shareState === "sharing" || shareState === "shared") return;
+    setShareState("sharing");
+    try {
+      // Step quality down until the upload fits the gallery size cap.
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL("image/jpeg", quality);
+      while (dataUrl.length > 1.4 * 1024 * 1024 && quality > 0.4) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+      const totalStr = formatTotals(marketTotals(result));
+      const n = result.bottles.length;
+      const caption = totalStr
+        ? `${n} wine${n === 1 ? "" : "s"} · ${totalStr} at market`
+        : `${n} wine${n === 1 ? "" : "s"}`;
+      const res = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: dataUrl.split(",")[1],
+          caption,
+          sceneType: result.sceneType,
+        }),
+      });
+      if (!res.ok) throw new Error(`share failed (${res.status})`);
+      setShareState("shared");
+      onShared?.();
+    } catch (err) {
+      console.error(err);
+      setShareState("failed");
+    }
+  };
+
   return (
     <div className="preview">
       <canvas ref={canvasRef} style={{ width: "100%", height: "auto" }} />
       <button className="btn" onClick={download} style={{ marginTop: 12 }}>
         Download summary card
+      </button>
+      <button
+        className="btn secondary"
+        onClick={share}
+        disabled={shareState === "sharing" || shareState === "shared"}
+      >
+        {shareState === "idle" && "🌍 Share to public gallery"}
+        {shareState === "sharing" && "Sharing…"}
+        {shareState === "shared" && "✓ Shared to gallery"}
+        {shareState === "failed" && "Share failed — tap to retry"}
       </button>
     </div>
   );
