@@ -185,6 +185,14 @@ restaurant shows:
 - The actual **menu photos**, when the list came from scans — each opens
   the full scanned analysis.
 
+Signed in as the admin account (the same Google login gated in
+[Admin](#admin) above), an **✏️ Edit prices** toggle appears above "All
+wines." While active, each wine's market price becomes an editable field
+with its own **Confirm** button — saving recalculates that wine's
+markup/discount immediately and updates it everywhere on the page (top
+value, top rated, the full list). Everything else about the view is
+unchanged; only the market price is editable here.
+
 Wine entries never expire, but anything not re-seen for **6 months** gets a
 "⚠️ dated" flag (and the whole venue gets a banner when its newest menu
 info is that old). Re-scanning a menu refreshes the venue: new sightings of

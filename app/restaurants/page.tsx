@@ -134,9 +134,47 @@ function DeltaLabel({ pct }: { pct: number }) {
   );
 }
 
-function WineRow({ w, badge }: { w: VenueWine; badge?: string }) {
+function WineRow({
+  w,
+  badge,
+  editable,
+  onSave,
+}: {
+  w: VenueWine;
+  badge?: string;
+  editable?: boolean;
+  onSave?: (w: VenueWine, amount: number) => Promise<void>;
+}) {
   const rating = bestRating(w);
   const dated = isStale(`${w.seenAt}T12:00:00.000Z`);
+  const currency = w.marketPrice?.currency ?? w.listedPrice?.currency ?? "USD";
+  const [draft, setDraft] = useState(
+    w.marketPrice ? String(w.marketPrice.amount) : ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(w.marketPrice ? String(w.marketPrice.amount) : "");
+  }, [w.marketPrice?.amount, w.marketPrice?.currency]);
+
+  const confirm = async () => {
+    const amount = parseFloat(draft);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setErr("Enter a valid price");
+      return;
+    }
+    setErr(null);
+    setSaving(true);
+    try {
+      await onSave?.(w, amount);
+    } catch (e: any) {
+      setErr(e?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="venue-wine">
       <div className="venue-wine-name">
@@ -172,19 +210,42 @@ function WineRow({ w, badge }: { w: VenueWine; badge?: string }) {
             {formatMoney(w.listedPrice.amount, w.listedPrice.currency)}
           </strong>
         )}
-        {w.marketPrice && (
+        {!editable && w.marketPrice && (
           <span style={{ color: "var(--muted)" }}>
             {" "}
             (mkt {formatMoney(w.marketPrice.amount, w.marketPrice.currency)})
           </span>
         )}
-        {w.priceDeltaPct != null && (
+        {!editable && w.priceDeltaPct != null && (
           <>
             {" · "}
             <DeltaLabel pct={w.priceDeltaPct} />
           </>
         )}
       </div>
+      {editable && (
+        <div className="venue-wine-edit">
+          <span style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+            Market price ({currency}):
+          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            className="venue-edit-input"
+            value={draft}
+            disabled={saving}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button className="chip" disabled={saving} onClick={confirm}>
+            {saving ? "Saving…" : "Confirm"}
+          </button>
+          {err && (
+            <span style={{ color: "#d70015", fontSize: "0.78rem" }}>{err}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -198,6 +259,8 @@ function VenueDetail({ slug }: { slug: string }) {
     useState<(typeof PRICE_BUCKETS)[number]["key"]>("any");
   const [sortBy, setSortBy] = useState<SortKey>("default");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +275,46 @@ function VenueDetail({ slug }: { slug: string }) {
       cancelled = true;
     };
   }, [slug]);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIsAdmin(!!d?.isAdmin))
+      .catch(() => {});
+  }, []);
+
+  const saveMarketPrice = async (w: VenueWine, amount: number) => {
+    if (!venue) return;
+    const currency = w.marketPrice?.currency ?? w.listedPrice?.currency ?? "USD";
+    const res = await fetch("/api/venues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        slug: venue.slug,
+        producer: w.producer,
+        wineName: w.wineName,
+        vintage: w.vintage,
+        marketPrice: { amount, currency },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error ?? "Save failed");
+    const updated: VenueWine = data.wine;
+    setVenue((prev) =>
+      prev
+        ? {
+            ...prev,
+            wines: prev.wines.map((x) =>
+              x.producer === w.producer &&
+              x.wineName === w.wineName &&
+              x.vintage === w.vintage
+                ? updated
+                : x
+            ),
+          }
+        : prev
+    );
+  };
 
   const topValue = useMemo(
     () =>
@@ -349,7 +452,13 @@ function VenueDetail({ slug }: { slug: string }) {
             Ranked by listed price vs typical market price.
           </p>
           {topValue.map((w, i) => (
-            <WineRow key={`v${i}`} w={w} badge={`#${i + 1}`} />
+            <WineRow
+              key={`v${i}`}
+              w={w}
+              badge={`#${i + 1}`}
+              editable={editMode}
+              onSave={saveMarketPrice}
+            />
           ))}
         </div>
       )}
@@ -363,19 +472,50 @@ function VenueDetail({ slug }: { slug: string }) {
             Ranked by Vivino / CellarTracker / critic scores.
           </p>
           {topRated.map((w, i) => (
-            <WineRow key={`r${i}`} w={w} badge={`#${i + 1}`} />
+            <WineRow
+              key={`r${i}`}
+              w={w}
+              badge={`#${i + 1}`}
+              editable={editMode}
+              onSave={saveMarketPrice}
+            />
           ))}
         </div>
       )}
 
       <div className="card">
-        <h3 style={{ fontSize: "1rem", marginBottom: 10 }}>
-          🍷 All wines ({filtered.length}
-          {filtered.length !== venue.wines.length
-            ? ` of ${venue.wines.length}`
-            : ""}
-          )
+        <h3
+          style={{
+            fontSize: "1rem",
+            marginBottom: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <span>
+            🍷 All wines ({filtered.length}
+            {filtered.length !== venue.wines.length
+              ? ` of ${venue.wines.length}`
+              : ""}
+            )
+          </span>
+          {isAdmin && (
+            <button
+              className={`chip${editMode ? " active" : ""}`}
+              onClick={() => setEditMode((e) => !e)}
+            >
+              {editMode ? "✓ Done editing" : "✏️ Edit prices"}
+            </button>
+          )}
         </h3>
+        {editMode && (
+          <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginBottom: 10 }}>
+            Editing market prices — confirm each one to save and
+            recalculate its markup/discount.
+          </p>
+        )}
         <div className="venue-filters">
           {TYPE_FILTERS.map((t) => (
             <button
@@ -447,7 +587,12 @@ function VenueDetail({ slug }: { slug: string }) {
           </p>
         )}
         {filtered.map((w, i) => (
-          <WineRow key={i} w={w} />
+          <WineRow
+            key={i}
+            w={w}
+            editable={editMode}
+            onSave={saveMarketPrice}
+          />
         ))}
       </div>
     </>

@@ -62,7 +62,7 @@ export function venueSlug(name: string): string {
     .slice(0, 60);
 }
 
-function wineIdentity(w: {
+export function wineIdentity(w: {
   producer: string | null;
   wineName: string | null;
   vintage: string | null;
@@ -235,4 +235,40 @@ export async function setVenueDate(
   };
   await redis.hset(VENUES_KEY, { [slug]: summary });
   return record.wines.length;
+}
+
+// Admin tool: correct a single wine's market price and recompute its
+// listed-vs-market delta accordingly. Identity is producer+wineName+vintage
+// (the same key merges use), so it targets exactly the wine the caller saw
+// in the venue record — nothing else about the wine changes.
+export async function updateWineMarketPrice(
+  slug: string,
+  wine: { producer: string | null; wineName: string | null; vintage: string | null },
+  marketPrice: Money
+): Promise<VenueWine | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  const record = await getVenue(slug);
+  if (!record) return null;
+
+  const id = wineIdentity(wine);
+  const idx = record.wines.findIndex((w) => wineIdentity(w) === id);
+  if (idx < 0) return null;
+
+  const updated: VenueWine = { ...record.wines[idx], marketPrice };
+  updated.marketPriceSource = "Manually adjusted";
+  updated.priceDeltaPct =
+    updated.listedPrice &&
+    updated.listedPrice.currency === marketPrice.currency &&
+    marketPrice.amount > 0
+      ? Math.round(
+          ((updated.listedPrice.amount - marketPrice.amount) /
+            marketPrice.amount) *
+            100
+        )
+      : null;
+
+  record.wines[idx] = updated;
+  await redis.set(`${VENUE_PREFIX}${slug}`, record);
+  return updated;
 }
