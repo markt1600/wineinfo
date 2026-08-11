@@ -119,9 +119,13 @@ creates scan-history or gallery entries.
      Barolo averaged $1,571 in the US vs ~$867 in the UK). Add a
      market-qualified query phrasing (e.g. `"<wine> price Singapore"`)
      among the attempts, and note the market in `note` when a local
-     listing was used. Fall back to the international average when no
-     local listing exists — never skip a wine just because the local
-     market has none.
+     listing was used. **For Singapore venues the fallback ladder is:
+     Singapore retailers → Hong Kong retailers → international
+     average** (HK is the nearest comparable fine-wine hub, so its
+     retail pricing tracks what a Singapore buyer realistically pays
+     better than a US or European number). For other markets: local →
+     international. Never skip a wine just because the local market has
+     none — always fall through the ladder.
    - **NEVER use a restaurant's or bar's own wine-list price as the
      market price** — those already carry the very markup the app is
      measuring, so using one silently corrupts the listed-vs-market
