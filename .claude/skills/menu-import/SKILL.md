@@ -47,19 +47,28 @@ creates scan-history or gallery entries.
      JH→James Halliday. Unknown codes: keep the code as the source.
    - Prefer a small Python parser + manual spot-checks; print per-page
      counts and skipped lines, and fix the stragglers by hand.
-3. **Research market prices.** Split the rows into batches of ~50 and
-   launch parallel subagents (Agent tool, `general-purpose`), each
-   returning ONLY a JSON array `[{id, usd, src, note?}]`:
+3. **Research market prices — full web verification, every wine, no
+   exceptions.** Split the rows into small batches (~20-25 wines each,
+   NOT ~50 — each wine needs its own search, so a batch's search budget
+   must comfortably exceed its wine count) and launch parallel subagents
+   (Agent tool, `general-purpose`), each returning ONLY a JSON array
+   `[{id, usd, src, note?}]`:
+   - EVERY wine MUST be priced via `WebSearch`, no exceptions — do NOT
+     price any wine from model knowledge alone, even a wine you're
+     confident about. `src` must always be `"web:<domain>"`. There is no
+     search cap; the agent keeps searching until every id in its batch
+     has a real web-sourced price or is confirmed unfindable after a
+     genuine attempt (try at least 2 phrasings before giving up).
    - Typical international retail (Wine-Searcher-style average, ex-tax)
      for that exact wine, vintage, and size.
-   - Well-known current releases may be priced from model knowledge
-     (`src: "knowledge"`); anything expensive (≥ ~US$1000), pre-2005, or
-     uncertain MUST be verified with a web search (`src: "web:<domain>"`).
-     Cap ~30 searches per agent, spending them on the priciest bottles.
-     On smaller models, verify more and trust knowledge less.
-   - Unfindable → `usd: null`.
-   - 375/1500 ml: real format price if known, else scale the 750 ml price
-     (×0.55 / ×2.2) and set `note: "scaled"`.
+   - Unfindable after real search effort → `usd: null`, with a note
+     explaining why (e.g. "no listings found", "producer unidentifiable").
+   - 375/1500 ml: search for the real format price first; only fall back
+     to scaling the 750 ml price (×0.55 / ×2.2, `note: "scaled"`) when a
+     search for that specific format turns up nothing.
+   - This step is slow and search-heavy by design — that trade-off is
+     intentional so every market price in the import is independently
+     verifiable, not a guess.
 4. **Convert** to the menu's currency (one web search for the FX rate) so
    listed-vs-market percentages compute.
 5. **Build the CSV** with exactly these columns (loose header matching,
@@ -74,16 +83,16 @@ creates scan-history or gallery entries.
    ```
 
    - `currency` = the menu currency (market price already converted).
-   - `marketPriceSource`: the verifying domain, or
-     "Claude estimate (<month year>)" for knowledge prices — label
-     honestly, and append ", scaled by size" where scaled.
+   - `marketPriceSource`: the verifying domain (every priced row has one,
+     since every price is web-sourced) — append ", scaled by size" where
+     scaled.
    - `aliases`: only needed when the canonical name differs from what the
      menu prints (`producer|wineName|vintage`, `;`-separated).
    - Same `venue`, `listedCurrency`, `menuDate` on every row.
 6. **Validate**: `npx --yes tsx -e` calling `csvToWineEntries` from
    `lib/wineImportCsv.ts` on the file — 0 errors, row count matches.
 7. **Deliver** the CSV to the user (SendUserFile or the working
-   directory) with a short summary: wine count, how many verified vs
-   estimated vs unpriced, biggest discounts found. Tell them to upload it
+   directory) with a short summary: wine count, how many web-verified vs
+   unpriced (and why), biggest discounts found. Tell them to upload it
    at `/admin` → enter PIN → "Import wines". Batches of 100 are handled
    by the page automatically.
