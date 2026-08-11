@@ -159,6 +159,13 @@ entries.
 The same thing is scriptable via `POST /api/admin` with
 `{pin, action: "import_wines", entries: [...], defaultMenuDate?: "YYYY-MM-DD"}`.
 
+To fix the date on wines **already** in the Restaurants tab (imports don't
+overwrite an existing wine with an *older* date, so re-uploading the CSV
+won't backdate anything), a **"Change a restaurant's date"** card lets the
+admin pick a venue and a date and bulk-apply it to every wine that venue
+has — scriptable via `POST /api/admin` with
+`{pin, action: "set_venue_date", venueSlug, date: "YYYY-MM-DD"}`.
+
 ## Restaurants
 
 The **Restaurants** tab (🍽️ in the nav) collects every venue whose wine

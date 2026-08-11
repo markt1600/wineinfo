@@ -206,3 +206,33 @@ export async function getVenue(slug: string): Promise<VenueRecord | null> {
     return null;
   }
 }
+
+// Admin tool: bulk-set every wine's seenAt to a chosen date (e.g. to
+// correct a menu that was imported with the wrong date, or backdate one
+// that predates this app). Unlike upsertVenue, this always applies —
+// there's no "newer wins" comparison, since the admin is the source of
+// truth here. Returns the number of wines updated, or null if the venue
+// doesn't exist.
+export async function setVenueDate(
+  slug: string,
+  date: string
+): Promise<number | null> {
+  const redis = getRedis();
+  if (!redis || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const record = await getVenue(slug);
+  if (!record) return null;
+
+  record.wines = record.wines.map((w) => ({ ...w, seenAt: date }));
+  record.updatedAt = `${date}T12:00:00.000Z`;
+  await redis.set(`${VENUE_PREFIX}${slug}`, record);
+
+  const summary: VenueSummary = {
+    slug: record.slug,
+    name: record.name,
+    wineCount: record.wines.length,
+    photoCount: record.menuPhotos.length,
+    updatedAt: record.updatedAt,
+  };
+  await redis.hset(VENUES_KEY, { [slug]: summary });
+  return record.wines.length;
+}

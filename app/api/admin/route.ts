@@ -16,7 +16,7 @@ import {
   wineKey,
   type WineCacheEntry,
 } from "@/lib/wineCache";
-import { upsertVenue, type VenueWine } from "@/lib/venueStore";
+import { setVenueDate, upsertVenue, type VenueWine } from "@/lib/venueStore";
 import type { Money } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -58,10 +58,12 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     pin?: string;
-    action?: "verify" | "delete" | "import_wines";
+    action?: "verify" | "delete" | "import_wines" | "set_venue_date";
     urls?: string[];
     entries?: WineImport[];
     defaultMenuDate?: string; // YYYY-MM-DD fallback when a row has no menuDate
+    venueSlug?: string;
+    date?: string; // YYYY-MM-DD, for set_venue_date
   };
   if (!body?.pin || !pinMatches(body.pin)) {
     return Response.json({ error: "Incorrect PIN" }, { status: 401 });
@@ -169,6 +171,23 @@ export async function POST(request: Request) {
       keysWritten,
       venues: byVenue.size,
     });
+  }
+
+  if (body.action === "set_venue_date") {
+    if (!body.venueSlug || !body.date) {
+      return Response.json(
+        { error: "Missing venueSlug or date" },
+        { status: 400 }
+      );
+    }
+    const count = await setVenueDate(body.venueSlug, body.date);
+    if (count === null) {
+      return Response.json(
+        { error: "Venue not found or invalid date" },
+        { status: 404 }
+      );
+    }
+    return Response.json({ ok: true, wines: count });
   }
 
   if (body.action === "delete") {

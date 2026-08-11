@@ -31,12 +31,28 @@ export default function AdminPage() {
     () => new Date().toISOString().slice(0, 10)
   );
   const [overrideDate, setOverrideDate] = useState(false);
+  const [venues, setVenues] = useState<
+    { slug: string; name: string; wineCount: number; updatedAt: string }[]
+  >([]);
+  const [venueSlug, setVenueSlug] = useState("");
+  const [venueDate, setVenueDate] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [venueDateResult, setVenueDateResult] = useState<string | null>(null);
 
   const loadEntries = async () => {
     const res = await fetch("/api/gallery");
     const data = await res.json();
     setEntries(Array.isArray(data.entries) ? data.entries : []);
     setSelected(new Set());
+  };
+
+  const loadVenues = async () => {
+    const res = await fetch("/api/venues");
+    const data = await res.json().catch(() => ({}));
+    const list = Array.isArray(data.venues) ? data.venues : [];
+    setVenues(list);
+    if (list.length > 0 && !venueSlug) setVenueSlug(list[0].slug);
   };
 
   const unlock = async () => {
@@ -53,7 +69,7 @@ export default function AdminPage() {
         throw new Error(data?.error ?? "Incorrect PIN");
       }
       setUnlocked(true);
-      await loadEntries();
+      await Promise.all([loadEntries(), loadVenues()]);
     } catch (e: any) {
       setMessage(e?.message ?? "Could not unlock.");
     } finally {
@@ -156,6 +172,34 @@ export default function AdminPage() {
       setImportFileName(null);
     } catch (e: any) {
       setImportResult(e?.message ?? "Import failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyVenueDate = async () => {
+    if (!venueSlug) return;
+    setBusy(true);
+    setVenueDateResult(null);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pin,
+          action: "set_venue_date",
+          venueSlug,
+          date: venueDate,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Update failed");
+      setVenueDateResult(
+        `✓ Updated ${data.wines} wine${data.wines === 1 ? "" : "s"} to ${venueDate}.`
+      );
+      await loadVenues();
+    } catch (e: any) {
+      setVenueDateResult(e?.message ?? "Update failed.");
     } finally {
       setBusy(false);
     }
@@ -323,6 +367,54 @@ export default function AdminPage() {
             <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 10 }}>
               {importResult}
             </p>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>
+            📅 Change a restaurant&apos;s date
+          </h2>
+          <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: 12 }}>
+            Bulk-corrects every wine&apos;s date for a restaurant already in
+            the Restaurants tab — use this to fix a menu that was imported
+            with the wrong date (this always applies, even to backdate a
+            venue).
+          </p>
+          {venues.length === 0 ? (
+            <p style={{ color: "var(--muted)" }}>No restaurants stored yet.</p>
+          ) : (
+            <>
+              <select
+                className="currency"
+                style={{ margin: "0 0 10px" }}
+                disabled={busy}
+                value={venueSlug}
+                onChange={(e) => setVenueSlug(e.target.value)}
+              >
+                {venues.map((v) => (
+                  <option key={v.slug} value={v.slug}>
+                    {v.name} ({v.wineCount} wines)
+                  </option>
+                ))}
+              </select>
+              <input
+                type="date"
+                className="currency"
+                style={{ margin: "0 0 10px" }}
+                disabled={busy}
+                value={venueDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setVenueDate(e.target.value)}
+              />
+              <button className="btn" disabled={busy} onClick={applyVenueDate}>
+                {busy ? "Applying…" : "Apply date to all its wines"}
+              </button>
+              {venueDateResult && (
+                <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 10 }}>
+                  {venueDateResult}
+                </p>
+              )}
+            </>
           )}
         </div>
         </>
