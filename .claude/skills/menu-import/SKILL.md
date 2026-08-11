@@ -110,6 +110,18 @@ creates scan-history or gallery entries.
      specific format first; fall back to scaling the 750 ml price
      (×0.55 / ×2.2, `note: "scaled"`) only when a dedicated search for
      that format turns up nothing.
+   - **Prefer retailers in the venue's own market** — the menu currency
+     tells you which market that is (SGD → Singapore, GBP → UK, …). When
+     comparable listings exist (same wine, vintage, size), a local
+     retailer's price beats a foreign one: the diner's realistic
+     alternative to the menu price is the local shop, not a Paris
+     cellar, and wine prices can differ 2x+ between markets (a 1971
+     Barolo averaged $1,571 in the US vs ~$867 in the UK). Add a
+     market-qualified query phrasing (e.g. `"<wine> price Singapore"`)
+     among the attempts, and note the market in `note` when a local
+     listing was used. Fall back to the international average when no
+     local listing exists — never skip a wine just because the local
+     market has none.
    - **NEVER use a restaurant's or bar's own wine-list price as the
      market price** — those already carry the very markup the app is
      measuring, so using one silently corrupts the listed-vs-market
