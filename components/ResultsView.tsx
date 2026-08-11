@@ -5,7 +5,7 @@ import AnnotatedImage from "@/components/AnnotatedImage";
 import EditResults, { type ReviseEdit } from "@/components/EditResults";
 import InfographicCard from "@/components/InfographicCard";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
-import { formatTotals, marketTotals } from "@/lib/totals";
+import { formatTotals, marketTotals, pricedBottleCount } from "@/lib/totals";
 
 // Shown when a photo contains no wine at all — one is picked at random
 // per analysis so repeat offenders get fresh material.
@@ -217,6 +217,8 @@ export default function ResultsView({
 }: Props) {
   const bestValueId = result.bestValue.bottleId ?? null;
   const totalStr = formatTotals(marketTotals(result));
+  const pricedN = pricedBottleCount(result);
+  const identifiedN = result.bottles.filter((b) => b.identified).length;
   // Scans with zero identified bottles never enter history — the card can
   // still be viewed and downloaded, it just isn't saved. In-place updates
   // of an already-saved scan ("replace") are unaffected.
@@ -257,7 +259,11 @@ export default function ResultsView({
         {totalStr && (
           <div className="best-banner" style={{ borderColor: "var(--border)" }}>
             <strong style={{ color: "var(--text)" }}>
-              Total value at market price:
+              Total value at market price
+              {pricedN < identifiedN
+                ? ` (${pricedN} of ${identifiedN} wines)`
+                : ` (${pricedN} wine${pricedN === 1 ? "" : "s"})`}
+              :
             </strong>{" "}
             {totalStr}
           </div>

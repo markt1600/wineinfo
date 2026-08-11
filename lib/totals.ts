@@ -15,6 +15,13 @@ export function marketTotals(result: AnalysisResult): Map<string, number> {
 }
 
 export function formatMoney(amount: number, currency: string): string {
+  // SGD always renders as "S$" — some locales show a bare "$" for it, which
+  // is indistinguishable from USD when both appear on screen.
+  if (currency === "SGD") {
+    return `S$${new Intl.NumberFormat(undefined, {
+      maximumFractionDigits: amount >= 100 ? 0 : 2,
+    }).format(amount)}`;
+  }
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
@@ -48,18 +55,27 @@ export function totalsInSGD(totals: Map<string, number>): number | null {
   return sum;
 }
 
-// "$1,234" or "$900 + €120" when currencies are mixed; appends an
-// approximate SGD aggregate ("US$900 + €120 (≈ S$2,331)") unless the
-// totals are already entirely SGD.
+// One figure, in SGD: "S$1,371" when everything was already SGD,
+// "≈ S$1,371" when FX conversion was involved. Falls back to a
+// per-currency breakdown only when some currency has no known rate.
 export function formatTotals(totals: Map<string, number>): string | null {
   if (totals.size === 0) return null;
-  const parts = [...totals.entries()]
+  if (totals.size === 1 && totals.has("SGD")) {
+    return formatMoney(totals.get("SGD")!, "SGD");
+  }
+  const sgd = totalsInSGD(totals);
+  if (sgd) return `≈ ${formatMoney(sgd, "SGD")}`;
+  return [...totals.entries()]
     .map(([cur, amt]) => formatMoney(amt, cur))
     .join(" + ");
-  const onlySGD = totals.size === 1 && totals.has("SGD");
-  if (onlySGD) return parts;
-  const sgd = totalsInSGD(totals);
-  return sgd ? `${parts} (≈ ${formatMoney(sgd, "SGD")})` : parts;
+}
+
+// How many bottles actually contributed to the totals — surfaced next to
+// the total so partial research coverage is visible instead of silent.
+export function pricedBottleCount(result: AnalysisResult): number {
+  return result.bottles.filter(
+    (b) => b.marketPrice && b.marketPrice.currency !== "UNK"
+  ).length;
 }
 
 // Feed caption: "Opus One 2019, Caymus 2021 +2 more · $412 at market"

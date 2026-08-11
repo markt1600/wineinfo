@@ -7,6 +7,7 @@ import {
   formatMoney,
   formatTotals,
   marketTotals,
+  pricedBottleCount,
 } from "@/lib/totals";
 
 // Phone-sized (9:16) shareable infographic: annotated photo on top, a
@@ -248,7 +249,14 @@ export default function InfographicCard({
       ctx.stroke();
       ctx.font = "34px sans-serif";
       ctx.fillStyle = "#c9a3ad";
-      ctx.fillText("Total value at market price", PAD + 36, barY + 56);
+      const pricedN = pricedBottleCount(result);
+      ctx.fillText(
+        pricedN > 0
+          ? `Total value at market price (${pricedN} wine${pricedN === 1 ? "" : "s"})`
+          : "Total value at market price",
+        PAD + 36,
+        barY + 56
+      );
       ctx.font = "bold 58px sans-serif";
       ctx.fillStyle = "#f0c46c";
       ctx.fillText(
