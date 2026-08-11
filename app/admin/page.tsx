@@ -27,6 +27,10 @@ export default function AdminPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [menuDate, setMenuDate] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [overrideDate, setOverrideDate] = useState(false);
 
   const loadEntries = async () => {
     const res = await fetch("/api/gallery");
@@ -121,15 +125,22 @@ export default function AdminPage() {
     try {
       let wines = 0;
       let keys = 0;
+      // Applying the override replaces every row's date; otherwise each
+      // row keeps whatever the CSV's menuDate column gave it, and
+      // defaultMenuDate below only fills in rows that had none.
+      const entriesToSend = overrideDate
+        ? importEntries.map((en) => ({ ...en, seenAt: menuDate }))
+        : importEntries;
       // The API caps a request at 200 entries — send in batches of 100.
-      for (let i = 0; i < importEntries.length; i += 100) {
+      for (let i = 0; i < entriesToSend.length; i += 100) {
         const res = await fetch("/api/admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             pin,
             action: "import_wines",
-            entries: importEntries.slice(i, i + 100),
+            entries: entriesToSend.slice(i, i + 100),
+            defaultMenuDate: menuDate,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -246,6 +257,35 @@ export default function AdminPage() {
             </a>
             .
           </p>
+          <div className="edit-row" style={{ paddingTop: 0 }}>
+            <div className="edit-name">📅 Menu date</div>
+            <input
+              type="date"
+              className="currency"
+              style={{ margin: 0 }}
+              disabled={busy}
+              value={menuDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setMenuDate(e.target.value)}
+            />
+            <label
+              className="edit-flag"
+              style={{ color: "var(--text)", marginTop: 8 }}
+            >
+              <input
+                type="checkbox"
+                checked={overrideDate}
+                disabled={busy}
+                onChange={(e) => setOverrideDate(e.target.checked)}
+              />
+              Apply this date to every wine (overrides the CSV&apos;s own
+              menuDate column)
+            </label>
+            <p style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: 6 }}>
+              Left unchecked, each row keeps its own menuDate from the CSV
+              (or defaults to the date above if it has none).
+            </p>
+          </div>
           <input
             type="file"
             accept=".csv,text/csv"

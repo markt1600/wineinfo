@@ -46,7 +46,10 @@ export interface VenueSummary {
 const VENUES_KEY = "venues"; // hash: slug -> VenueSummary
 const VENUE_PREFIX = "venue:";
 const MAX_PHOTOS = 12;
-const MAX_WINES = 400;
+// Large curated lists (e.g. a full restaurant wine book) can run past a
+// thousand entries — keep real headroom above that rather than silently
+// truncating a legitimately big list.
+const MAX_WINES = 2000;
 
 // "Le Bernardin" -> "le-bernardin"
 export function venueSlug(name: string): string {
@@ -106,9 +109,15 @@ export async function upsertVenue(
       const prev = byId.get(id);
       if (!prev || w.seenAt >= prev.seenAt) byId.set(id, w);
     }
-    const merged = [...byId.values()]
-      .sort((a, b) => (a.seenAt < b.seenAt ? 1 : -1))
-      .slice(0, MAX_WINES);
+    const combined = [...byId.values()].sort((a, b) =>
+      a.seenAt < b.seenAt ? 1 : -1
+    );
+    if (combined.length > MAX_WINES) {
+      console.warn(
+        `venue "${trimmedName}": ${combined.length} wines exceeds the ${MAX_WINES} cap — oldest ${combined.length - MAX_WINES} dropped`
+      );
+    }
+    const merged = combined.slice(0, MAX_WINES);
 
     const photos = existing.menuPhotos.filter((p) => p.url !== photo?.url);
     if (photo?.url) photos.unshift(photo);

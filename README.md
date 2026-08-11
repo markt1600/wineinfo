@@ -150,11 +150,14 @@ Vivino/CellarTracker ratings, plus optional alias spellings such as how a
 menu prints the name) and they are written straight into the Redis wine
 cache, so future scans of those wines skip web research entirely. Rows with
 a `venue` column (plus optional `listedPrice`/`listedCurrency`/`menuDate`)
-also populate that restaurant's wine list in the Restaurants tab. Imports
-only seed the cache and venue lists — they never create gallery or
-scan-history entries.
+also populate that restaurant's wine list in the Restaurants tab. A **menu
+date** picker on the import card lets the admin backdate an import — it
+fills in any row missing its own `menuDate`, or, with "apply to every
+wine" checked, overrides the whole CSV's dates at once. Imports only seed
+the cache and venue lists — they never create gallery or scan-history
+entries.
 The same thing is scriptable via `POST /api/admin` with
-`{pin, action: "import_wines", entries: [...]}`.
+`{pin, action: "import_wines", entries: [...], defaultMenuDate?: "YYYY-MM-DD"}`.
 
 ## Restaurants
 

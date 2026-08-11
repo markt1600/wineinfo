@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     action?: "verify" | "delete" | "import_wines";
     urls?: string[];
     entries?: WineImport[];
+    defaultMenuDate?: string; // YYYY-MM-DD fallback when a row has no menuDate
   };
   if (!body?.pin || !pinMatches(body.pin)) {
     return Response.json({ error: "Incorrect PIN" }, { status: 401 });
@@ -84,6 +85,10 @@ export async function POST(request: Request) {
     if (entries.length === 0) {
       return Response.json({ error: "No entries" }, { status: 400 });
     }
+    const defaultMenuDate =
+      body.defaultMenuDate && /^\d{4}-\d{2}-\d{2}$/.test(body.defaultMenuDate)
+        ? body.defaultMenuDate
+        : new Date().toISOString().slice(0, 10);
     let wines = 0;
     let keysWritten = 0;
     const byVenue = new Map<string, VenueWine[]>();
@@ -150,7 +155,7 @@ export async function POST(request: Request) {
           seenAt:
             e.seenAt && /^\d{4}-\d{2}-\d{2}$/.test(e.seenAt)
               ? e.seenAt
-              : new Date().toISOString().slice(0, 10),
+              : defaultMenuDate,
         });
         byVenue.set(venueName, list);
       }
