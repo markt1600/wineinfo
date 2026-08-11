@@ -16,7 +16,12 @@ import {
   wineKey,
   type WineCacheEntry,
 } from "@/lib/wineCache";
-import { setVenueDate, upsertVenue, type VenueWine } from "@/lib/venueStore";
+import {
+  deleteVenue,
+  setVenueDate,
+  upsertVenue,
+  type VenueWine,
+} from "@/lib/venueStore";
 import type { Money } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -58,7 +63,12 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     pin?: string;
-    action?: "verify" | "delete" | "import_wines" | "set_venue_date";
+    action?:
+      | "verify"
+      | "delete"
+      | "import_wines"
+      | "set_venue_date"
+      | "delete_venue";
     urls?: string[];
     entries?: WineImport[];
     defaultMenuDate?: string; // YYYY-MM-DD fallback when a row has no menuDate
@@ -171,6 +181,17 @@ export async function POST(request: Request) {
       keysWritten,
       venues: byVenue.size,
     });
+  }
+
+  if (body.action === "delete_venue") {
+    if (!body.venueSlug) {
+      return Response.json({ error: "Missing venueSlug" }, { status: 400 });
+    }
+    const ok = await deleteVenue(body.venueSlug);
+    if (!ok) {
+      return Response.json({ error: "Venue not found" }, { status: 404 });
+    }
+    return Response.json({ ok: true });
   }
 
   if (body.action === "set_venue_date") {

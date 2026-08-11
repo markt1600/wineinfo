@@ -196,6 +196,20 @@ export async function listVenues(): Promise<VenueSummary[]> {
   }
 }
 
+// Admin tool: remove a venue entirely (e.g. before re-importing a
+// corrected CSV from scratch). Only the venue index + record are
+// removed — menu photos stay owned by the underlying scans/gallery and
+// are not deleted here.
+export async function deleteVenue(slug: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis || !/^[a-z0-9-]{1,60}$/.test(slug)) return false;
+  const existing = await redis.get(`${VENUE_PREFIX}${slug}`);
+  if (!existing) return false;
+  await redis.del(`${VENUE_PREFIX}${slug}`);
+  await redis.hdel(VENUES_KEY, slug);
+  return true;
+}
+
 export async function getVenue(slug: string): Promise<VenueRecord | null> {
   const redis = getRedis();
   if (!redis || !/^[a-z0-9-]{1,60}$/.test(slug)) return null;

@@ -205,6 +205,35 @@ export default function AdminPage() {
     }
   };
 
+  const deleteVenueEntries = async () => {
+    if (!venueSlug) return;
+    const v = venues.find((x) => x.slug === venueSlug);
+    if (
+      !window.confirm(
+        `Delete ALL ${v?.wineCount ?? ""} wines for "${v?.name ?? venueSlug}"? This removes the restaurant entirely from the Restaurants tab so you can re-import it fresh. This cannot be undone.`
+      )
+    )
+      return;
+    setBusy(true);
+    setVenueDateResult(null);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, action: "delete_venue", venueSlug }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Delete failed");
+      setVenueDateResult(`✓ Deleted "${v?.name ?? venueSlug}" and all its wines.`);
+      setVenueSlug("");
+      await loadVenues();
+    } catch (e: any) {
+      setVenueDateResult(e?.message ?? "Delete failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main>
       <header className="app">
@@ -372,13 +401,11 @@ export default function AdminPage() {
 
         <div className="card">
           <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>
-            📅 Change a restaurant&apos;s date
+            🍽️ Manage a restaurant
           </h2>
           <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: 12 }}>
-            Bulk-corrects every wine&apos;s date for a restaurant already in
-            the Restaurants tab — use this to fix a menu that was imported
-            with the wrong date (this always applies, even to backdate a
-            venue).
+            Bulk-correct a restaurant&apos;s wine dates, or delete it
+            entirely so you can re-import a corrected CSV from scratch.
           </p>
           {venues.length === 0 ? (
             <p style={{ color: "var(--muted)" }}>No restaurants stored yet.</p>
@@ -408,6 +435,14 @@ export default function AdminPage() {
               />
               <button className="btn" disabled={busy} onClick={applyVenueDate}>
                 {busy ? "Applying…" : "Apply date to all its wines"}
+              </button>
+              <button
+                className="btn secondary"
+                style={{ marginTop: 10, color: "#d70015" }}
+                disabled={busy}
+                onClick={deleteVenueEntries}
+              >
+                🗑️ Delete all wines for this restaurant
               </button>
               {venueDateResult && (
                 <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 10 }}>
