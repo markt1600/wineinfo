@@ -147,12 +147,12 @@ owner's Google login — the account whose verified email matches `ADMIN_EMAIL`
   name) rendered at `/opengraph-image`, so pasting the link into WhatsApp,
   iMessage, Slack, or X shows a proper preview. Set `NEXT_PUBLIC_SITE_URL` if
   the auto-detected production URL isn't right.
-- **Camera captures are kept:** a photo taken with the in-app camera isn't
-  stored by the browser, so tapping **Analyze** also saves a full-quality
-  copy to your device (on Android it shows up in your gallery; on iOS it
-  lands in Files → Downloads, since Apple doesn't let web apps write to the
-  camera roll directly). Library picks are already on your phone and aren't
-  duplicated.
+- **Keep your camera shots:** a photo taken with the in-app camera isn't
+  stored by the browser, so the results include a **Download original
+  photo** button for the full-quality capture (on Android it shows up in
+  your gallery; on iOS it lands in Files → Downloads, since Apple doesn't
+  let web apps write to the camera roll directly). Library picks are
+  already on your phone.
 - **No wine in the photo?** The app says so — with a rotating quip
   ("Did you drink too much?", "Time to open a bottle?"…).
 - **Native feel on phones:** bottom tab-bar navigation with safe-area

@@ -89,10 +89,10 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Fresh camera captures aren't kept by the browser, so save a copy to the
-  // device when the user commits to analyzing. (Browsers can't write to the
-  // photo library directly; this downloads the full-quality original.)
-  const saveCaptureToDevice = (file: File) => {
+  // Fresh camera captures aren't kept by the browser, so the results view
+  // offers a download of the full-quality original. (Browsers can't write
+  // to the photo library directly.)
+  const downloadOriginal = (file: File) => {
     try {
       const url = URL.createObjectURL(file);
       const a = document.createElement("a");
@@ -273,6 +273,25 @@ export default function Home() {
     </div>
   ) : null;
 
+  // Camera shots only exist inside the app until downloaded — offer the
+  // full-quality original alongside the results. Library picks are already
+  // on the device.
+  const originalDownloadCard =
+    photoSource === "camera" && originalFile ? (
+      <div className="card">
+        <button
+          className="btn secondary"
+          onClick={() => downloadOriginal(originalFile)}
+        >
+          📥 Download original photo
+        </button>
+        <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 8 }}>
+          Photos taken in the app aren&apos;t saved to your phone
+          automatically — download a copy if you want to keep the original.
+        </p>
+      </div>
+    ) : null;
+
   return (
     <main>
       <header className="app">
@@ -368,30 +387,13 @@ export default function Home() {
               <button
                 className="btn"
                 style={{ marginTop: 12 }}
-                onClick={() => {
-                  if (photoSource === "camera" && originalFile) {
-                    saveCaptureToDevice(originalFile);
-                  }
-                  analyze(prepared);
-                }}
+                onClick={() => analyze(prepared)}
               >
                 ✅ Analyze this photo
               </button>
               <button className="btn secondary" onClick={cancelPhoto}>
                 ✖️ Cancel
               </button>
-              {photoSource === "camera" && (
-                <p
-                  style={{
-                    color: "var(--muted)",
-                    fontSize: "0.8rem",
-                    marginTop: 8,
-                  }}
-                >
-                  📥 A copy of this photo is saved to your device when you tap
-                  Analyze.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -407,7 +409,12 @@ export default function Home() {
           eventDate={
             savedScanId && !hasListedPrices ? eventDate : undefined
           }
-          afterImage={currencyCard}
+          afterImage={
+            <>
+              {currencyCard}
+              {originalDownloadCard}
+            </>
+          }
           onSaved={(id) => {
             if (id) setSavedScanId(id);
             setGalleryRefresh((n) => n + 1);
