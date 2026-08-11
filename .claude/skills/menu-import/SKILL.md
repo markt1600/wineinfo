@@ -160,9 +160,18 @@ creates scan-history or gallery entries.
      substring match will misfile it as retry-worthy. Spot-check a
      sample of bucket-3 notes before relaunching; anything that's
      actually a real finding belongs in bucket 2.
-   - It will not reach 100% in one session for a large menu, and that's
-     fine: label the honest remainder (see step 5) rather than treating
-     partial coverage as a failure to fix with more retries.
+   - **When the session's WebSearch budget is exhausted, PAUSE — do not
+     substitute model knowledge.** A wave whose subagents report budget
+     exhaustion is the signal to stop launching waves entirely: deliver
+     the checkpoint CSV with the researched-so-far state, leave every
+     unreached wine's market price blank, and tell the user the
+     remainder needs a fresh session (with
+     `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` raised if possible) to
+     continue from the saved remaining-ids list. NEVER fill the gap
+     with memory-based prices — not even labeled ones. Un-web-verified
+     prices have repeatedly turned out wrong on re-research, and a
+     blank cell is honest where a guessed number quietly poisons the
+     markup calculations until someone audits it.
 4. **Convert** to the menu's currency (one web search for the FX rate) so
    listed-vs-market percentages compute.
 5. **Build the CSV** with exactly these columns (loose header matching,
@@ -178,11 +187,13 @@ creates scan-history or gallery entries.
 
    - `currency` = the menu currency (market price already converted).
    - `marketPriceSource`: the verifying domain for web-verified rows;
-     append ", scaled by size" where scaled. For wines confirmed
-     genuinely unfindable after real search effort, it's fine to fall
-     back to a labeled estimate (`"Claude estimate (<month year>)"`)
-     rather than leaving the row unpriced — never silently relabel a
-     knowledge guess as web-sourced.
+     append ", scaled by size" where scaled. **Every price in the CSV
+     must be web-verified — never emit a price from model knowledge,
+     labeled or not.** Wines confirmed genuinely unfindable after real
+     search effort stay unpriced (blank marketPrice) with the reason
+     noted; wines never reached because the search budget ran out stay
+     unpriced and go to the next session's wave (see the pause rule in
+     step 3).
    - `aliases`: only needed when the canonical name differs from what the
      menu prints (`producer|wineName|vintage`, `;`-separated).
    - Same `venue`, `listedCurrency`, `menuDate` on every row.
@@ -193,7 +204,8 @@ creates scan-history or gallery entries.
    a wave's results are merged — the user should never be left waiting
    through multiple waves with nothing to show, and each checkpoint is
    a safe fallback if the session is interrupted. On the final delivery,
-   give a short summary: wine count, how many truly web-verified vs
-   labeled-estimate vs unpriced (and why), biggest discounts found. Tell
+   give a short summary: wine count, how many web-verified vs unpriced
+   (split by genuinely-unfindable vs awaiting-budget, and why), biggest
+   discounts found. Tell
    the user to upload it at `/admin` → enter PIN → "Import wines".
    Batches of 100 are handled by the page automatically.
