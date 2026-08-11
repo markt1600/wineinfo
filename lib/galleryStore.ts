@@ -7,6 +7,14 @@ import type { AnalysisResult } from "@/lib/schema";
 export const LIST_KEY = "gallery:entries";
 export const SCAN_KEY_PREFIX = "scan:";
 
+// Per-user scan history: a Redis list of scan ids, newest first. Unlike
+// the public feed (capped at 20), user scans keep their records/images
+// so periods like "past year" work.
+export function userScansKey(username: string): string {
+  return `userscans:${username.toLowerCase()}`;
+}
+export const USER_SCANS_MAX = 500;
+
 // "Consumed" = a bottle lineup with no pricing (wines that were drunk);
 // "Seen" = priced wines spotted in a store or on a menu.
 export type ScanClassification = "Consumed" | "Seen";

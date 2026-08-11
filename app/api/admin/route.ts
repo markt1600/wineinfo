@@ -6,6 +6,7 @@ import {
   SCAN_KEY_PREFIX,
   galleryEnabled,
   getBlobToken,
+  userScansKey,
   type GalleryEntry,
   type ScanRecord,
 } from "@/lib/galleryStore";
@@ -85,6 +86,12 @@ export async function POST(request: Request) {
           .get<ScanRecord>(`${SCAN_KEY_PREFIX}${e.id}`)
           .catch(() => null);
         if (rec?.photoUrl) del(rec.photoUrl, { token }).catch(() => {});
+        // Admin deletion is total — drop it from the owner's history too.
+        if (rec?.username && rec.username !== "guest") {
+          await redis
+            .lrem(userScansKey(rec.username), 0, e.id)
+            .catch(() => {});
+        }
         await redis.del(`${SCAN_KEY_PREFIX}${e.id}`).catch(() => {});
       }
     }

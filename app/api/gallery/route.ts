@@ -4,8 +4,10 @@ import { readSession } from "@/lib/auth";
 import {
   LIST_KEY,
   SCAN_KEY_PREFIX,
+  USER_SCANS_MAX,
   galleryEnabled,
   getBlobToken,
+  userScansKey,
   type GalleryEntry,
   type ScanClassification,
   type ScanRecord,
@@ -242,10 +244,18 @@ export async function POST(request: Request) {
     };
 
     await redis.lpush(LIST_KEY, entry);
-    // Trim the feed and fully delete anything that falls off the end.
+    // Index the scan in the poster's personal history.
+    if (hasRecord && username !== "guest") {
+      await redis.lpush(userScansKey(username), id);
+      await redis.ltrim(userScansKey(username), 0, USER_SCANS_MAX - 1);
+    }
+    // Trim the public feed. Guests' aged-out scans are fully deleted;
+    // signed-in users' scans keep their record + images so they remain
+    // available in "My Wines" history.
     const evicted = await redis.lrange<GalleryEntry>(LIST_KEY, MAX_ENTRIES, -1);
     await redis.ltrim(LIST_KEY, 0, MAX_ENTRIES - 1);
     for (const e of evicted) {
+      if (e.username && e.username !== "guest") continue;
       del(e.url, { token }).catch((err) =>
         console.error("gallery blob delete failed:", err)
       );

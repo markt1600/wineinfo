@@ -115,6 +115,13 @@ date).
 - Scans are classified automatically: photos with prices (store shelf, menu)
   are **Seen** 👀; unpriced bottle lineups are **Consumed** 🍷. The
   classification is stored with each scan and shown in the feed.
+- **My Wines** (🍇 in the nav) is each signed-in user's personal history:
+  the last 5 scans by default, filterable by period (week / 30 / 60 / 90
+  days / year / all time) and by Consumed / Seen / both, plus a search box
+  that finds every scan containing a given wine. Results list Consumed scans
+  first (newest first), then Seen, each linking to the full report. Signed-in
+  users' scans are kept even after they age off the public feed (up to 500
+  per user); guests' aged-out scans are deleted as before.
 
 ## Cost controls
 

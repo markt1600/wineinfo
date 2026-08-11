@@ -33,6 +33,7 @@ export default function NavBar() {
         <div className="nav-items">
           {item("/", "📷", "Scan")}
           {item("/gallery", "🗂️", "Scans")}
+          {item("/my", "🍇", "My Wines")}
           {item("/login", "👤", displayName ?? "Login")}
         </div>
       </div>

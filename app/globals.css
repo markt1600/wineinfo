@@ -574,3 +574,48 @@ h2 {
   height: 20px;
   accent-color: #d70015;
 }
+
+.my-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.my-row:first-of-type {
+  border-top: none;
+}
+
+.my-row img {
+  width: 52px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--panel-2);
+}
+
+.my-row > span:first-of-type {
+  flex: 1;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.my-row em {
+  display: block;
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.my-chevron {
+  color: var(--muted);
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
