@@ -10,6 +10,12 @@ import {
   type GalleryEntry,
   type ScanRecord,
 } from "@/lib/galleryStore";
+import {
+  cacheEnabled,
+  cacheSet,
+  wineKey,
+  type WineCacheEntry,
+} from "@/lib/wineCache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,8 +28,19 @@ function pinMatches(pin: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-// Admin actions: verify the PIN, or delete selected scans (card blob,
-// photo blob, and analysis record).
+// One imported wine: the cache-entry fields plus optional alias spellings
+// (e.g. how a menu prints the name) that should resolve to the same entry.
+interface WineImport extends Partial<WineCacheEntry> {
+  aliases?: {
+    producer?: string | null;
+    wineName?: string | null;
+    vintage?: string | null;
+  }[];
+}
+
+// Admin actions: verify the PIN, delete selected scans (card blob, photo
+// blob, and analysis record), or bulk-import pre-researched wines into the
+// Redis wine cache (no gallery/scan-history entries are created).
 export async function POST(request: Request) {
   if (!process.env.ADMIN_PIN) {
     return Response.json(
@@ -34,8 +51,9 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     pin?: string;
-    action?: "verify" | "delete";
+    action?: "verify" | "delete" | "import_wines";
     urls?: string[];
+    entries?: WineImport[];
   };
   if (!body?.pin || !pinMatches(body.pin)) {
     return Response.json({ error: "Incorrect PIN" }, { status: 401 });
@@ -43,6 +61,55 @@ export async function POST(request: Request) {
 
   if (body.action === "verify") {
     return Response.json({ ok: true });
+  }
+
+  if (body.action === "import_wines") {
+    if (!cacheEnabled()) {
+      return Response.json(
+        { error: "Redis is not configured" },
+        { status: 503 }
+      );
+    }
+    const entries = (Array.isArray(body.entries) ? body.entries : []).slice(
+      0,
+      200
+    );
+    if (entries.length === 0) {
+      return Response.json({ error: "No entries" }, { status: 400 });
+    }
+    let wines = 0;
+    let keysWritten = 0;
+    for (const e of entries) {
+      if (!e || (!e.producer && !e.wineName)) continue;
+      const entry: WineCacheEntry = {
+        producer: e.producer ?? null,
+        wineName: e.wineName ?? null,
+        vintage: e.vintage ?? null,
+        region: e.region ?? null,
+        grapeVariety: e.grapeVariety ?? null,
+        wineType: e.wineType ?? null,
+        marketPrice: e.marketPrice ?? null,
+        marketPriceSource: e.marketPriceSource ?? null,
+        ratings: Array.isArray(e.ratings) ? e.ratings : [],
+        fetchedAt: e.fetchedAt ?? new Date().toISOString(),
+      };
+      // Write the canonical key plus any alias spellings (as printed on a
+      // menu) so future scans hit the cache however the name is read.
+      const keys = new Set([
+        wineKey(entry.producer, entry.wineName, entry.vintage),
+      ]);
+      for (const a of Array.isArray(e.aliases) ? e.aliases : []) {
+        if (a && (a.producer || a.wineName)) {
+          keys.add(wineKey(a.producer, a.wineName, a.vintage));
+        }
+      }
+      for (const k of keys) {
+        await cacheSet(k, entry);
+        keysWritten++;
+      }
+      wines++;
+    }
+    return Response.json({ ok: true, wines, keysWritten });
   }
 
   if (body.action === "delete") {

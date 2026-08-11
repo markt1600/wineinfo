@@ -144,6 +144,13 @@ select and delete saved scans. The footer link to it only appears for the
 owner's Google login — the account whose verified email matches `ADMIN_EMAIL`
 (the page itself stays PIN-protected regardless).
 
+The admin API also supports bulk-importing pre-researched wines straight
+into the Redis wine cache (`POST /api/admin` with
+`{pin, action: "import_wines", entries: [...]}`) — each entry takes the
+wine-cache fields plus optional `aliases` (alternate spellings, e.g. as a
+menu prints the name). Imports only seed the cache so future scans skip web
+research; they never create gallery or scan-history entries.
+
 ## Sharing & mobile
 
 - **Link previews:** the app ships an Open Graph card (wine bottles + the app
