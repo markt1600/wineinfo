@@ -110,6 +110,16 @@ creates scan-history or gallery entries.
      specific format first; fall back to scaling the 750 ml price
      (×0.55 / ×2.2, `note: "scaled"`) only when a dedicated search for
      that format turns up nothing.
+   - **NEVER use a restaurant's or bar's own wine-list price as the
+     market price** — those already carry the very markup the app is
+     measuring, so using one silently corrupts the listed-vs-market
+     delta. Only independent retail, wholesale, or auction listings
+     count. If the only search hit is some other restaurant's wine list
+     (this really happens for rare cuvées — a CUT import once stored
+     $187 for a ~$55 wine because the sole hit was another restaurant's
+     list), keep searching other phrasings, and if nothing independent
+     turns up, mark the wine `null`/"no listings found" instead. Bake
+     this rule into every subagent's prompt.
    - **After each wave**, harvest every subagent's JSON (grep/parse each
      task's transcript for the final `[...]` array — don't rely on
      reading it back through the conversation) and classify every id
