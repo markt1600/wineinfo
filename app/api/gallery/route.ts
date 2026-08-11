@@ -175,6 +175,11 @@ export async function POST(request: Request) {
     });
   }
 
+  // A photo only enters history when at least one bottle was identified.
+  if (body.result && !body.result.bottles.some((b) => b.identified)) {
+    return Response.json({ ok: false, skipped: "no identified bottles" });
+  }
+
   const session = readSession(request.headers.get("cookie"));
   const saved = await saveScan({
     cardBytes,

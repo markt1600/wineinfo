@@ -152,6 +152,8 @@ export default function InfographicCard({
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
+        // Server declined the save (e.g. nothing identified) — stay silent.
+        if (data?.skipped) return;
         setSaveState("saved");
         onSaved?.(data?.entry?.id ?? scanId ?? null);
       } else {

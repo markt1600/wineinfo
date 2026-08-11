@@ -1,10 +1,24 @@
 "use client";
 
+import { useMemo } from "react";
 import AnnotatedImage from "@/components/AnnotatedImage";
 import EditResults, { type ReviseEdit } from "@/components/EditResults";
 import InfographicCard from "@/components/InfographicCard";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
 import { formatTotals, marketTotals } from "@/lib/totals";
+
+// Shown when a photo contains no wine at all — one is picked at random
+// per analysis so repeat offenders get fresh material.
+const NO_WINE_JOKES = [
+  "Did you drink too much? There's no wine in this picture. 🍷",
+  "Not a single bottle found. Time to open one? 🍾",
+  "Zero bottles detected. Is the cellar… empty? 😱",
+  "I looked everywhere. No wine. This is a personal tragedy. 😢",
+  "No wine detected — blink twice if you need directions to a wine shop. 🧭",
+  "A wine-free photo? Bold choice for a wine app. 🤨",
+  "No bottles found. On the bright side: zero calories. ✨",
+  "My sommelier senses detect… absolutely nothing. Hydrate, then try again. 🕵️",
+];
 
 function sizeLabel(ml: number): string {
   if (ml === 375) return "375 mL (half)";
@@ -187,6 +201,17 @@ export default function ResultsView({
 }: Props) {
   const bestValueId = result.bestValue.bottleId ?? null;
   const totalStr = formatTotals(marketTotals(result));
+  // Scans with zero identified bottles never enter history — the card can
+  // still be viewed and downloaded, it just isn't saved. In-place updates
+  // of an already-saved scan ("replace") are unaffected.
+  const hasIdentified = result.bottles.some((b) => b.identified);
+  const effectiveSaveMode =
+    saveMode === "new" && !hasIdentified ? "off" : saveMode;
+  // Stable per analysis (re-picks only when the result object changes).
+  const noWineJoke = useMemo(
+    () => NO_WINE_JOKES[Math.floor(Math.random() * NO_WINE_JOKES.length)],
+    [result]
+  );
 
   return (
     <>
@@ -223,9 +248,13 @@ export default function ResultsView({
           <BottleCard key={b.id} bottle={b} isBest={b.id === bestValueId} />
         ))}
         {result.bottles.length === 0 && (
-          <p style={{ color: "var(--muted)" }}>
-            No wine bottles or menu entries were found in this photo.
-          </p>
+          <div style={{ textAlign: "center", padding: "14px 0" }}>
+            <p style={{ fontSize: "2.2rem", marginBottom: 8 }}>🫗</p>
+            <p style={{ fontWeight: 600, marginBottom: 6 }}>
+              No wine bottles or menu entries found in this photo.
+            </p>
+            <p style={{ color: "var(--muted)" }}>{noWineJoke}</p>
+          </div>
         )}
         {result.bottles.some((b) => b.marketPriceEstimated) && (
           <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 10 }}>
@@ -249,11 +278,11 @@ export default function ResultsView({
             📱 Shareable summary
           </h2>
           <InfographicCard
-            key={`${imageDataUrl}:${revision}:${saveMode}`}
+            key={`${imageDataUrl}:${revision}:${effectiveSaveMode}`}
             imageDataUrl={imageDataUrl}
             result={result}
             bestValueId={bestValueId}
-            saveMode={saveMode}
+            saveMode={effectiveSaveMode}
             scanId={scanId}
             onSaved={onSaved}
           />

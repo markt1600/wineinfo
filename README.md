@@ -36,7 +36,9 @@ gold. You can download the annotated image.
   request can take a few minutes.
 - **Fire-and-forget:** the server saves every completed analysis (photo, full
   results, attribution, classification) before replying, so a scan survives
-  even if the tab is closed mid-processing. The photo serves as the feed
+  even if the tab is closed mid-processing. Photos where **no bottle could be
+  identified** are not saved at all — they never appear in recent scans or
+  the database. The photo serves as the feed
   thumbnail until the browser renders the summary card and upgrades the entry
   in place.
 - Server-side refusal fallbacks are enabled, so a false-positive safety decline
@@ -129,12 +131,27 @@ date).
   users' scans are kept even after they age off the public feed (up to 500
   per user); guests' aged-out scans are deleted as before.
 
+### Admin
+
+A PIN-protected admin page (`/admin`, PIN via `ADMIN_PIN`) lets the owner
+select and delete saved scans. The footer link to it only appears for the
+owner's Google login — the account whose verified email matches `ADMIN_EMAIL`
+(the page itself stays PIN-protected regardless).
+
 ## Sharing & mobile
 
 - **Link previews:** the app ships an Open Graph card (wine bottles + the app
   name) rendered at `/opengraph-image`, so pasting the link into WhatsApp,
   iMessage, Slack, or X shows a proper preview. Set `NEXT_PUBLIC_SITE_URL` if
   the auto-detected production URL isn't right.
+- **Camera captures are kept:** a photo taken with the in-app camera isn't
+  stored by the browser, so tapping **Analyze** also saves a full-quality
+  copy to your device (on Android it shows up in your gallery; on iOS it
+  lands in Files → Downloads, since Apple doesn't let web apps write to the
+  camera roll directly). Library picks are already on your phone and aren't
+  duplicated.
+- **No wine in the photo?** The app says so — with a rotating quip
+  ("Did you drink too much?", "Time to open a bottle?"…).
 - **Native feel on phones:** bottom tab-bar navigation with safe-area
   insets, app icons and a web manifest (installable via "Add to Home Screen"
   as a standalone app), no tap-highlight flashes or accidental

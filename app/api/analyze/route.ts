@@ -538,20 +538,23 @@ export async function POST(request: Request) {
         // the result survives even if the user already closed the tab. The
         // photo doubles as the feed thumbnail until the browser renders the
         // summary card and replaces it (via replaceId).
+        // Photos with zero identified bottles don't enter history at all.
         let scanId: string | null = null;
-        try {
-          const session = readSession(request.headers.get("cookie"));
-          const saved = await saveScan({
-            photoBytes: Buffer.from(body.image, "base64"),
-            result: data,
-            caption: buildScanCaption(data),
-            sceneType: data.sceneType,
-            postedBy: session?.displayName ?? "Guest",
-            username: session?.username ?? "guest",
-          });
-          scanId = saved?.id ?? null;
-        } catch (err) {
-          console.error("server-side scan save failed:", err);
+        if (data.bottles.some((b) => b.identified)) {
+          try {
+            const session = readSession(request.headers.get("cookie"));
+            const saved = await saveScan({
+              photoBytes: Buffer.from(body.image, "base64"),
+              result: data,
+              caption: buildScanCaption(data),
+              sceneType: data.sceneType,
+              postedBy: session?.displayName ?? "Guest",
+              username: session?.username ?? "guest",
+            });
+            scanId = saved?.id ?? null;
+          } catch (err) {
+            console.error("server-side scan save failed:", err);
+          }
         }
 
         send({ type: "progress", pct: 100 });

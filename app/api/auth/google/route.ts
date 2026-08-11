@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     client_id: clientId,
     redirect_uri: `${origin}/api/auth/google/callback`,
     response_type: "code",
-    scope: "openid profile",
+    scope: "openid profile email",
     state,
     prompt: "select_account",
   });

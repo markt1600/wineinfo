@@ -52,7 +52,14 @@ export async function GET(request: Request) {
 
     const claims = JSON.parse(
       Buffer.from(tokens.id_token.split(".")[1], "base64url").toString()
-    ) as { sub?: string; name?: string; given_name?: string; family_name?: string };
+    ) as {
+      sub?: string;
+      name?: string;
+      given_name?: string;
+      family_name?: string;
+      email?: string;
+      email_verified?: boolean;
+    };
     if (!claims.sub) throw new Error("no subject");
 
     const fullName =
@@ -61,12 +68,18 @@ export async function GET(request: Request) {
       "Google User";
     const username = `google:${claims.sub}`;
     const displayName = firstNameLastInitial(fullName);
+    // Only trust the email if Google says it's verified (gates the admin UI).
+    const email =
+      claims.email && claims.email_verified !== false
+        ? claims.email
+        : undefined;
 
     const redis = getRedis();
     if (redis) {
       const user: UserRecord = {
         username,
         displayName,
+        ...(email ? { email } : {}),
         provider: "google",
         createdAt: new Date().toISOString(),
       };
@@ -82,7 +95,7 @@ export async function GET(request: Request) {
       status: 302,
       headers: [
         ["Location", `${origin}/`],
-        ["Set-Cookie", sessionSetCookie({ username, displayName })],
+        ["Set-Cookie", sessionSetCookie({ username, displayName, email })],
         ["Set-Cookie", "waid_oauth_state=; Path=/; Max-Age=0"],
       ],
     });

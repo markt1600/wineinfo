@@ -16,11 +16,13 @@ const SESSION_DAYS = 30;
 export interface Session {
   username: string; // stable account key ("markt", "google:1234...")
   displayName: string; // what the feed shows ("Mark T." or "markt")
+  email?: string; // verified email from Google sign-in (absent for others)
 }
 
 export interface UserRecord {
   username: string;
   displayName: string;
+  email?: string;
   salt?: string;
   hash?: string;
   provider: "credentials" | "google";
@@ -52,6 +54,7 @@ export function createSessionToken(session: Session): string {
       JSON.stringify({
         u: session.username,
         d: session.displayName,
+        ...(session.email ? { e: session.email } : {}),
         exp: Date.now() + SESSION_DAYS * 86400_000,
       })
     )
@@ -78,7 +81,11 @@ export function readSession(cookieHeader: string | null): Session | null {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (typeof data.exp !== "number" || data.exp < Date.now()) return null;
     if (!data.u || !data.d) return null;
-    return { username: String(data.u), displayName: String(data.d) };
+    return {
+      username: String(data.u),
+      displayName: String(data.d),
+      ...(data.e ? { email: String(data.e) } : {}),
+    };
   } catch {
     return null;
   }
@@ -114,6 +121,18 @@ export function verifyPassword(
 
 export function accountsEnabled(): boolean {
   return getRedis() !== null;
+}
+
+// The admin UI (footer link + admin page shortcuts) is only surfaced to the
+// deployment owner, identified by their Google-verified email. Override with
+// the ADMIN_EMAIL env var; the admin API itself is still PIN-protected.
+const DEFAULT_ADMIN_EMAIL = "markh.tan@gmail.com";
+
+export function isAdminSession(session: Session | null): boolean {
+  const adminEmail = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL)
+    .trim()
+    .toLowerCase();
+  return !!session?.email && session.email.trim().toLowerCase() === adminEmail;
 }
 
 export const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;

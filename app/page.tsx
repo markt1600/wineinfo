@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Gallery from "@/components/Gallery";
 import ResultsView from "@/components/ResultsView";
@@ -57,6 +57,13 @@ export default function Home() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
+  // Original capture kept at full quality so a fresh camera shot can be
+  // saved to the device when analysis starts.
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
+  const [photoSource, setPhotoSource] = useState<"camera" | "library">(
+    "library"
+  );
+  const [isAdmin, setIsAdmin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +80,38 @@ export default function Home() {
   const [eventDate, setEventDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
+
+  // The Admin footer link is only shown to the deployment owner's login.
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setIsAdmin(!!d?.isAdmin))
+      .catch(() => {});
+  }, []);
+
+  // Fresh camera captures aren't kept by the browser, so save a copy to the
+  // device when the user commits to analyzing. (Browsers can't write to the
+  // photo library directly; this downloads the full-quality original.)
+  const saveCaptureToDevice = (file: File) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(
+        d.getDate()
+      )}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+      const ext = file.type === "image/png" ? "png" : "jpg";
+      a.href = url;
+      a.download = `wine-aid-${stamp}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch {
+      // Best-effort — never block the analysis over a failed save.
+    }
+  };
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
@@ -146,7 +185,10 @@ export default function Home() {
 
   // Selecting a photo only shows a preview — analysis starts after the
   // user confirms.
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    source: "camera" | "library"
+  ) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -155,6 +197,8 @@ export default function Home() {
     try {
       const img = await prepareImage(file);
       setPrepared(img);
+      setOriginalFile(file);
+      setPhotoSource(source);
       setAwaitingConfirm(true);
     } catch (err: any) {
       setError(err?.message || "Could not read that photo.");
@@ -163,6 +207,7 @@ export default function Home() {
 
   const cancelPhoto = () => {
     setPrepared(null);
+    setOriginalFile(null);
     setAwaitingConfirm(false);
     setCurrencyRequest(null);
   };
@@ -247,7 +292,7 @@ export default function Home() {
         accept="image/*"
         capture="environment"
         hidden
-        onChange={onFile}
+        onChange={(e) => onFile(e, "camera")}
       />
       {/* …no capture attribute lets the user pick from their photo library */}
       <input
@@ -255,7 +300,7 @@ export default function Home() {
         type="file"
         accept="image/*"
         hidden
-        onChange={onFile}
+        onChange={(e) => onFile(e, "library")}
       />
 
       <div className="card">
@@ -323,13 +368,30 @@ export default function Home() {
               <button
                 className="btn"
                 style={{ marginTop: 12 }}
-                onClick={() => analyze(prepared)}
+                onClick={() => {
+                  if (photoSource === "camera" && originalFile) {
+                    saveCaptureToDevice(originalFile);
+                  }
+                  analyze(prepared);
+                }}
               >
                 ✅ Analyze this photo
               </button>
               <button className="btn secondary" onClick={cancelPhoto}>
                 ✖️ Cancel
               </button>
+              {photoSource === "camera" && (
+                <p
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "0.8rem",
+                    marginTop: 8,
+                  }}
+                >
+                  📥 A copy of this photo is saved to your device when you tap
+                  Analyze.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -380,9 +442,11 @@ export default function Home() {
 
       <Gallery refreshKey={galleryRefresh} limit={5} showViewAll />
 
-      <p className="footer-links">
-        <Link href="/admin">Admin</Link>
-      </p>
+      {isAdmin && (
+        <p className="footer-links">
+          <Link href="/admin">Admin</Link>
+        </p>
+      )}
     </main>
   );
 }
