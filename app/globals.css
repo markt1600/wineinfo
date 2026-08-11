@@ -124,6 +124,13 @@ main {
     border-bottom: none;
     border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
+    /* Own compositing layer — without this, iOS Safari detaches the
+       fixed bar mid-viewport during momentum scrolling when it has a
+       backdrop-filter. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
   }
 
   .nav-brand {

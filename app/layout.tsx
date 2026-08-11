@@ -39,6 +39,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: "#f5f5f7",
+  viewportFit: "cover",
+  // Keyboard resizes the viewport, so the fixed bottom nav stays put
+  // instead of floating mid-screen above the keyboard.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
