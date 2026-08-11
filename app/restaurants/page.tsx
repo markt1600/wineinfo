@@ -56,10 +56,21 @@ function dateLabel(iso: string): string {
 }
 
 function wineName(w: VenueWine): string {
-  return (
-    [w.producer, w.wineName, w.vintage].filter(Boolean).join(" ") ||
-    "Unknown wine"
-  );
+  const base = [w.producer, w.wineName].filter(Boolean).join(" ");
+  // Fold in the appellation/place (the first segment of region, e.g.
+  // "Nuits-Saint-Georges" from "Nuits-Saint-Georges, Burgundy, France")
+  // whenever it isn't already implied by the producer/wine text — this is
+  // often the only thing that tells two bottlings from the same producer
+  // apart, and matters most for the many menu lines with no wine name at
+  // all (just "Maison Leroy 2017").
+  const place = (w.region || "").split(",")[0].trim();
+  const parts = [base];
+  if (place && !base.toLowerCase().includes(place.toLowerCase())) {
+    parts.push(place);
+  }
+  parts.push(w.vintage ?? "");
+  const joined = parts.filter(Boolean).join(" ");
+  return joined || "Unknown wine";
 }
 
 type TypeBucket = "Red" | "White" | "Sparkling" | "Rosé" | "Other";

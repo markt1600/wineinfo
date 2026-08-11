@@ -33,10 +33,30 @@ creates scan-history or gallery entries.
    needed); fall back to reading pages visually or OCR for scans.
 2. **Parse** every wine line into JSON rows:
    `{id, producer, wineName, vintage, sizeML, listedPrice, grape, wineType,
-   region, menuRating}`.
+   region, appellation, menuRating}`.
    - Wine type from section headers (Champagne→sparkling, Rosé, White,
-     Red, Sweet/Fortified). Region from section headers when per-line
-     regions are absent.
+     Red, Sweet/Fortified).
+   - **`region` MUST capture the most specific place name available, not
+     just the broad country/region.** Long wine lists are usually
+     grouped in nested subheaders — e.g. a "Burgundy" page broken into
+     sub-sections like "Nuits-Saint-Georges", "Gevrey-Chambertin",
+     "Chambolle-Musigny" (same pattern for Bordeaux communes — Pauillac,
+     Pomerol, Margaux — Rhône appellations — Côte-Rôtie, Hermitage,
+     Châteauneuf-du-Pâpe — and Italian sub-DOCGs — Barolo, Barbaresco,
+     Montalcino). Track the CURRENT innermost subheader as you walk the
+     page and set both `region` (full, e.g. "Nuits-Saint-Georges,
+     Burgundy, France") and `appellation` (just the specific place, e.g.
+     "Nuits-Saint-Georges") on every wine under it — not the coarse
+     page-level region alone. **This is not cosmetic: it's the #1 cause
+     of wrong prices.** A wine line often has no distinguishing name at
+     all (just "Maison Leroy 2017"), and Burgundy négociants/domaines
+     routinely sell wines from a dozen+ different appellations at prices
+     ranging from ~$300 to $30,000+ for the same vintage — the
+     appellation is frequently the ONLY thing that tells two bottlings
+     from the same producer apart. A first CUT-menu import skipped this
+     and priced several wines against the wrong appellation entirely
+     (one showed $4,800 in the database against a Nuits-Saint-Georges
+     bottling worth ~$2,150) — always carry the subheader through.
    - Vintage: keep the year; NV/MV → empty.
    - Sizes: page context (Half Bottle / Large Format pages) plus inline
      "(375ml)" style markers; default 750.
@@ -75,6 +95,16 @@ creates scan-history or gallery entries.
      no listings, mark it `null` with a note that does NOT mention
      budget (e.g. "no listings found", "producer unidentifiable"). This
      distinction is what makes retrying efficient — see below.
+   - **Always include the `appellation` in every search query when the
+     wine has one set** (e.g. `"Maison Leroy Nuits-Saint-Georges 2017
+     price"`, not just `"Maison Leroy 2017 price"`) — never search on
+     producer+vintage alone when the wine sits under a nested regional
+     subheader. Batch prompts should carry the appellation alongside each
+     wine's producer/wineName/vintage so the subagent has it up front.
+     Dropping the appellation is how the CUT/Maison Leroy mispricing
+     happened (see the `region`/`appellation` note in step 2) — a producer
+     with no distinguishing `wineName` is otherwise ambiguous between
+     bottlings that can differ by 10x in price.
    - Typical international retail (Wine-Searcher-style average, ex-tax)
      for that exact wine, vintage, and size. 375/1500 ml: search the
      specific format first; fall back to scaling the 750 ml price
