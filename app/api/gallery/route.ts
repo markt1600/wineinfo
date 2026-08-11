@@ -224,6 +224,7 @@ export async function POST(request: Request) {
         postedBy,
         username,
         classification,
+        eventDate: at.slice(0, 10),
         result: body.result!,
       };
       await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
@@ -237,6 +238,7 @@ export async function POST(request: Request) {
       postedBy,
       username,
       classification,
+      eventDate: at.slice(0, 10),
     };
 
     await redis.lpush(LIST_KEY, entry);

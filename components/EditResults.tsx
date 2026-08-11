@@ -18,17 +18,22 @@ export interface ReviseEdit {
 
 interface Props {
   result: AnalysisResult;
-  onConfirm: (edits: ReviseEdit[]) => Promise<void>;
+  // Current consumption date (YYYY-MM-DD). Provided only for Consumed
+  // scans that are persisted — enables the date editor.
+  eventDate?: string | null;
+  onConfirm: (edits: ReviseEdit[], newEventDate?: string) => Promise<void>;
 }
 
 // The "Edit results" tab: correct bottle sizes (re-prices for the new
-// size) and flag misidentified bottles (they turn red/unidentified).
-export default function EditResults({ result, onConfirm }: Props) {
+// size), flag misidentified bottles (they turn red/unidentified), and
+// adjust the consumption date on unpriced bottle lineups.
+export default function EditResults({ result, eventDate, onConfirm }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sizes, setSizes] = useState<Map<string, number>>(new Map());
   const [flags, setFlags] = useState<Set<string>>(new Set());
+  const [date, setDate] = useState<string>(eventDate ?? "");
 
   const editable = useMemo(
     () => result.bottles.filter((b) => b.identified),
@@ -51,13 +56,16 @@ export default function EditResults({ result, onConfirm }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editable, sizes, flags]);
 
-  if (editable.length === 0) return null;
+  const dateChanged = !!eventDate && !!date && date !== eventDate;
+  const changeCount = edits.length + (dateChanged ? 1 : 0);
+
+  if (editable.length === 0 && eventDate == null) return null;
 
   const confirm = async () => {
     setBusy(true);
     setError(null);
     try {
-      await onConfirm(edits);
+      await onConfirm(edits, dateChanged ? date : undefined);
       setOpen(false);
       setSizes(new Map());
       setFlags(new Set());
@@ -132,15 +140,33 @@ export default function EditResults({ result, onConfirm }: Props) {
               </div>
             );
           })}
+          {eventDate != null && (
+            <div className="edit-row">
+              <div className="edit-name">🍷 Consumption date</div>
+              <input
+                type="date"
+                className="currency"
+                style={{ margin: 0 }}
+                disabled={busy}
+                value={date}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <p style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: 6 }}>
+                When these wines were actually drunk — updates the record only,
+                no re-analysis.
+              </p>
+            </div>
+          )}
           <button
             className="btn"
             style={{ marginTop: 12 }}
-            disabled={busy || edits.length === 0}
+            disabled={busy || changeCount === 0}
             onClick={confirm}
           >
             {busy
               ? "Applying changes…"
-              : `Confirm changes${edits.length ? ` (${edits.length})` : ""}`}
+              : `Confirm changes${changeCount ? ` (${changeCount})` : ""}`}
           </button>
           {error && <div className="error">{error}</div>}
         </div>

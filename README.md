@@ -79,6 +79,27 @@ test the camera flow).
    database created directly at upstash.com works too — set
    `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.)
 
+## Editing results
+
+Every analysis (fresh or replayed from the gallery) has an **✏️ Edit results**
+tab:
+
+- **Bottle size** (375 mL / 750 mL / 1.5 L / 3 L): pricing is refreshed for
+  the corrected size — a size-specific market price is searched for, and when
+  none is found the 750 mL price is scaled by volume and marked with an
+  asterisk (`*` = estimated price; `†` on the summary card marks a rating from
+  another vintage).
+- **Misidentified** flag: the bottle turns red/unidentified, drops out of the
+  best-value pick, and its wine-cache entries are purged so the bad
+  identification isn't reused.
+- **Consumption date** (unpriced bottle lineups only): adjusts the date the
+  wines were drunk — a metadata-only update, no re-analysis.
+
+Confirming changes regenerates the summary card and updates the saved scan
+record in place. Every scan stores an `eventDate` — the consumption date for
+Consumed scans and the last-seen date for Seen scans (defaults to the scan
+date).
+
 ## Accounts & attribution
 
 - The app works fully in **guest mode** — signing in is optional. A login item

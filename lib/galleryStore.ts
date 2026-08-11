@@ -20,6 +20,9 @@ export interface GalleryEntry {
   postedBy?: string; // display name ("Mark T.", "markt") — absent = Guest
   username?: string; // stable account key; "guest" when not signed in
   classification?: ScanClassification;
+  // The date the wines were consumed (Consumed) or last seen (Seen).
+  // Defaults to the scan date; user-editable for Consumed scans.
+  eventDate?: string; // YYYY-MM-DD
 }
 
 export interface ScanRecord {
@@ -32,6 +35,7 @@ export interface ScanRecord {
   postedBy?: string;
   username?: string;
   classification?: ScanClassification;
+  eventDate?: string; // YYYY-MM-DD — consumption date / last-seen date
   result: AnalysisResult;
 }
 

@@ -70,6 +70,9 @@ export default function Home() {
   const [currencyRequest, setCurrencyRequest] = useState<string | null>(null);
   const [savedScanId, setSavedScanId] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [eventDate, setEventDate] = useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
@@ -79,6 +82,7 @@ export default function Home() {
     setCurrencyRequest(null);
     setSavedScanId(null);
     setRevision(0);
+    setEventDate(new Date().toISOString().slice(0, 10));
     setProgress(0);
     setStatus("Uploading photo…");
     try {
@@ -336,21 +340,38 @@ export default function Home() {
           saveMode={savedScanId && revision > 0 ? "replace" : "new"}
           scanId={savedScanId}
           revision={revision}
+          eventDate={
+            savedScanId && !hasListedPrices ? eventDate : undefined
+          }
           afterImage={currencyCard}
           onSaved={(id) => {
             if (id) setSavedScanId(id);
             setGalleryRefresh((n) => n + 1);
           }}
-          onRevise={async (edits: ReviseEdit[]) => {
-            const res = await fetch("/api/revise", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ result, edits }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error ?? "Revision failed");
-            setResult(data.result as AnalysisResult);
-            setRevision((r) => r + 1);
+          onRevise={async (edits: ReviseEdit[], newEventDate?: string) => {
+            if (edits.length > 0) {
+              const res = await fetch("/api/revise", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ result, edits }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data?.error ?? "Revision failed");
+              setResult(data.result as AnalysisResult);
+              setRevision((r) => r + 1);
+            }
+            if (newEventDate && savedScanId) {
+              const res = await fetch("/api/scan", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  id: savedScanId,
+                  eventDate: newEventDate,
+                }),
+              });
+              if (!res.ok) throw new Error("Could not update the date");
+              setEventDate(newEventDate);
+            }
           }}
         />
       )}

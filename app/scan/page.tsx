@@ -16,6 +16,7 @@ interface ScanRecord {
   at: string;
   postedBy?: string;
   classification?: "Consumed" | "Seen";
+  eventDate?: string;
   result: AnalysisResult;
 }
 
@@ -82,7 +83,14 @@ function ScanView() {
               month: "long",
               day: "numeric",
             })}
-            {record.classification && ` · ${record.classification}`}
+            {record.classification &&
+              ` · ${record.classification} on ${new Date(
+                `${record.eventDate ?? record.at.slice(0, 10)}T12:00:00`
+              ).toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}`}
           </p>
         )}
       </header>
@@ -115,16 +123,34 @@ function ScanView() {
           saveMode={revision > 0 ? "replace" : "off"}
           scanId={record.id}
           revision={revision}
-          onRevise={async (edits: ReviseEdit[]) => {
-            const res = await fetch("/api/revise", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ result: record.result, edits }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error ?? "Revision failed");
-            setRecord({ ...record, result: data.result as AnalysisResult });
-            setRevision((r) => r + 1);
+          eventDate={
+            record.result.bottles.some((b) => b.listedPrice)
+              ? undefined
+              : (record.eventDate ?? record.at.slice(0, 10))
+          }
+          onRevise={async (edits: ReviseEdit[], newEventDate?: string) => {
+            let updated = record;
+            if (edits.length > 0) {
+              const res = await fetch("/api/revise", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ result: record.result, edits }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data?.error ?? "Revision failed");
+              updated = { ...updated, result: data.result as AnalysisResult };
+              setRevision((r) => r + 1);
+            }
+            if (newEventDate) {
+              const res = await fetch("/api/scan", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: record.id, eventDate: newEventDate }),
+              });
+              if (!res.ok) throw new Error("Could not update the date");
+              updated = { ...updated, eventDate: newEventDate };
+            }
+            setRecord(updated);
           }}
         />
       )}

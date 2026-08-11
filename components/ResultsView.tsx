@@ -165,8 +165,9 @@ interface Props {
   saveMode?: "new" | "replace" | "off";
   scanId?: string | null;
   revision?: number; // bumps after an edit → summary card regenerates + re-saves
+  eventDate?: string | null; // enables the consumption-date editor (Consumed scans)
   onSaved?: (id: string | null) => void;
-  onRevise?: (edits: ReviseEdit[]) => Promise<void>;
+  onRevise?: (edits: ReviseEdit[], newEventDate?: string) => Promise<void>;
   afterImage?: React.ReactNode; // e.g. the currency-confirmation card
 }
 
@@ -179,6 +180,7 @@ export default function ResultsView({
   saveMode = "new",
   scanId = null,
   revision = 0,
+  eventDate,
   onSaved,
   onRevise,
   afterImage,
@@ -232,7 +234,14 @@ export default function ResultsView({
         )}
       </div>
 
-      {onRevise && <EditResults result={result} onConfirm={onRevise} />}
+      {onRevise && (
+        <EditResults
+          key={`edit:${revision}:${eventDate ?? ""}`}
+          result={result}
+          eventDate={eventDate}
+          onConfirm={onRevise}
+        />
+      )}
 
       {result.bottles.length > 0 && (
         <div className="card">
