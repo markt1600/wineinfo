@@ -1,0 +1,199 @@
+import { getRedis } from "@/lib/redis";
+import type { AnalysisResult, Money, Rating } from "@/lib/schema";
+
+// Per-restaurant wine lists, assembled from menu scans (sceneType
+// wine_menu with a venue name) and admin CSV imports. Stored separately
+// from the gallery/scan history: venue records survive feed trims and
+// deletions, and imports land here without ever touching the feed.
+
+export interface VenueWine {
+  producer: string | null;
+  wineName: string | null;
+  vintage: string | null;
+  region: string | null;
+  wineType: string | null;
+  bottleSizeML: number | null;
+  listedPrice: Money | null; // what the venue charges
+  marketPrice: Money | null;
+  marketPriceSource: string | null;
+  priceDeltaPct: number | null; // listed vs market (+ = markup, − = discount)
+  ratings: Rating[];
+  seenAt: string; // YYYY-MM-DD — when this wine was last seen on the menu
+}
+
+export interface VenueMenuPhoto {
+  url: string;
+  scanId?: string; // present when the photo belongs to a saved scan
+  at: string; // ISO
+}
+
+export interface VenueRecord {
+  slug: string;
+  name: string;
+  wines: VenueWine[];
+  menuPhotos: VenueMenuPhoto[];
+  updatedAt: string; // ISO — date of the newest menu information
+}
+
+export interface VenueSummary {
+  slug: string;
+  name: string;
+  wineCount: number;
+  photoCount: number;
+  updatedAt: string;
+}
+
+const VENUES_KEY = "venues"; // hash: slug -> VenueSummary
+const VENUE_PREFIX = "venue:";
+const MAX_PHOTOS = 12;
+const MAX_WINES = 400;
+
+// "Le Bernardin" -> "le-bernardin"
+export function venueSlug(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function wineIdentity(w: {
+  producer: string | null;
+  wineName: string | null;
+  vintage: string | null;
+}): string {
+  const norm = (s: string | null) =>
+    (s ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  return `${norm(w.producer)}|${norm(w.wineName)}|${norm(w.vintage) || "nv"}`;
+}
+
+// Merges new sightings into the venue's wine list (a fresher sighting of
+// the same wine replaces the older one), optionally adds a menu photo, and
+// refreshes the venues index.
+export async function upsertVenue(
+  name: string,
+  wines: VenueWine[],
+  photo?: VenueMenuPhoto | null
+): Promise<void> {
+  const redis = getRedis();
+  const trimmedName = name.trim();
+  const slug = venueSlug(trimmedName);
+  if (!redis || !slug) return;
+
+  try {
+    const key = `${VENUE_PREFIX}${slug}`;
+    const existing =
+      (await redis.get<VenueRecord>(key)) ??
+      ({
+        slug,
+        name: trimmedName,
+        wines: [],
+        menuPhotos: [],
+        updatedAt: new Date(0).toISOString(),
+      } as VenueRecord);
+
+    const byId = new Map(existing.wines.map((w) => [wineIdentity(w), w]));
+    for (const w of wines) {
+      if (!w.producer && !w.wineName) continue;
+      const id = wineIdentity(w);
+      const prev = byId.get(id);
+      if (!prev || w.seenAt >= prev.seenAt) byId.set(id, w);
+    }
+    const merged = [...byId.values()]
+      .sort((a, b) => (a.seenAt < b.seenAt ? 1 : -1))
+      .slice(0, MAX_WINES);
+
+    const photos = existing.menuPhotos.filter((p) => p.url !== photo?.url);
+    if (photo?.url) photos.unshift(photo);
+
+    let updatedAt = existing.updatedAt;
+    for (const w of wines) {
+      const iso = `${w.seenAt}T12:00:00.000Z`;
+      if (iso > updatedAt) updatedAt = iso;
+    }
+
+    const record: VenueRecord = {
+      slug,
+      name: trimmedName, // latest spelling wins
+      wines: merged,
+      menuPhotos: photos.slice(0, MAX_PHOTOS),
+      updatedAt,
+    };
+    await redis.set(key, record);
+    const summary: VenueSummary = {
+      slug,
+      name: record.name,
+      wineCount: merged.length,
+      photoCount: record.menuPhotos.length,
+      updatedAt,
+    };
+    await redis.hset(VENUES_KEY, { [slug]: summary });
+  } catch (err) {
+    console.error("venue upsert failed:", err);
+  }
+}
+
+// Feeds a saved menu scan into the venue store.
+export async function upsertVenueFromScan(
+  result: AnalysisResult,
+  scan: { photoUrl?: string; scanId?: string; at: string; eventDate?: string }
+): Promise<void> {
+  if (result.sceneType !== "wine_menu" || !result.venue?.trim()) return;
+  const seenAt = scan.eventDate ?? scan.at.slice(0, 10);
+  const wines: VenueWine[] = result.bottles
+    .filter((b) => b.identified)
+    .map((b) => ({
+      producer: b.producer,
+      wineName: b.wineName,
+      vintage: b.vintage,
+      region: b.region,
+      wineType: b.wineType,
+      bottleSizeML: b.bottleSizeML,
+      listedPrice: b.listedPrice,
+      marketPrice: b.marketPrice,
+      marketPriceSource: b.marketPriceSource,
+      priceDeltaPct: b.priceDeltaPct,
+      ratings: b.ratings,
+      seenAt,
+    }));
+  await upsertVenue(
+    result.venue,
+    wines,
+    scan.photoUrl
+      ? { url: scan.photoUrl, scanId: scan.scanId, at: scan.at }
+      : null
+  );
+}
+
+export async function listVenues(): Promise<VenueSummary[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const all = await redis.hgetall<Record<string, VenueSummary>>(VENUES_KEY);
+    if (!all) return [];
+    return Object.values(all).sort((a, b) =>
+      a.updatedAt < b.updatedAt ? 1 : -1
+    );
+  } catch (err) {
+    console.error("venue list failed:", err);
+    return [];
+  }
+}
+
+export async function getVenue(slug: string): Promise<VenueRecord | null> {
+  const redis = getRedis();
+  if (!redis || !/^[a-z0-9-]{1,60}$/.test(slug)) return null;
+  try {
+    return (await redis.get<VenueRecord>(`${VENUE_PREFIX}${slug}`)) ?? null;
+  } catch (err) {
+    console.error("venue read failed:", err);
+    return null;
+  }
+}

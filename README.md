@@ -148,10 +148,35 @@ The admin page also has a **wine import**: upload a CSV of pre-researched
 wines (template downloadable on the page — name, region, market price,
 Vivino/CellarTracker ratings, plus optional alias spellings such as how a
 menu prints the name) and they are written straight into the Redis wine
-cache, so future scans of those wines skip web research entirely. Imports
-only seed the cache — they never create gallery or scan-history entries.
+cache, so future scans of those wines skip web research entirely. Rows with
+a `venue` column (plus optional `listedPrice`/`listedCurrency`/`menuDate`)
+also populate that restaurant's wine list in the Restaurants tab. Imports
+only seed the cache and venue lists — they never create gallery or
+scan-history entries.
 The same thing is scriptable via `POST /api/admin` with
 `{pin, action: "import_wines", entries: [...]}`.
+
+## Restaurants
+
+The **Restaurants** tab (🍽️ in the nav) collects every venue whose wine
+menu has been scanned (or imported via the admin CSV). Selecting a
+restaurant shows:
+
+- Its full wine list in text form — listed price, market price,
+  markup/discount, and ratings for each wine — filterable by **type**
+  (red / white / sparkling / rosé) and **listed price** (< 100, 100–500,
+  500–1,000, or any price).
+- **🏆 Top value**: the 5 wines with the best listed-vs-market percentage.
+- **⭐ Top rated**: the 5 highest-rated wines (Vivino/CellarTracker/critic
+  scores normalized to a common scale).
+- The actual **menu photos**, when the list came from scans — each opens
+  the full scanned analysis.
+
+Wine entries never expire, but anything not re-seen for **6 months** gets a
+"⚠️ dated" flag (and the whole venue gets a banner when its newest menu
+info is that old). Re-scanning a menu refreshes the venue: new sightings of
+a wine replace older ones, new wines are added. Venue lists live outside
+the scan feed, so they survive feed trims and deletions.
 
 ## Sharing & mobile
 

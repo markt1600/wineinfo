@@ -1,3 +1,3 @@
-producer,wineName,vintage,region,grapeVariety,wineType,marketPrice,currency,marketPriceSource,rating1Source,rating1Score,rating1VintageMatch,rating1Url,rating2Source,rating2Score,rating2VintageMatch,rating2Url,aliases
-Château Margaux,Grand Vin,2015,"Margaux, Bordeaux",Cabernet Sauvignon blend,red,850,USD,Wine-Searcher,Vivino,4.6/5,true,https://www.vivino.com/wines/1136092,CellarTracker,96,true,,Ch. Margaux|Grand Vin|2015
-Cloudy Bay,Sauvignon Blanc,2023,"Marlborough, New Zealand",Sauvignon Blanc,white,32,USD,Wine-Searcher,Vivino,4.1/5,false,,,,,,"Cloudy Bay|Sauv Blanc|2023; Cloudy Bay|Sauvignon Blanc Marlborough|2023"
+producer,wineName,vintage,region,grapeVariety,wineType,marketPrice,currency,marketPriceSource,rating1Source,rating1Score,rating1VintageMatch,rating1Url,rating2Source,rating2Score,rating2VintageMatch,rating2Url,aliases,venue,listedPrice,listedCurrency,menuDate
+Château Margaux,Grand Vin,2015,"Margaux, Bordeaux",Cabernet Sauvignon blend,red,850,USD,Wine-Searcher,Vivino,4.6/5,true,https://www.vivino.com/wines/1136092,CellarTracker,96,true,,Ch. Margaux|Grand Vin|2015,Le Bernardin,2400,USD,2026-08-01
+Cloudy Bay,Sauvignon Blanc,2023,"Marlborough, New Zealand",Sauvignon Blanc,white,32,USD,Wine-Searcher,Vivino,4.1/5,false,,,,,,"Cloudy Bay|Sauv Blanc|2023; Cloudy Bay|Sauvignon Blanc Marlborough|2023",Le Bernardin,95,USD,2026-08-01

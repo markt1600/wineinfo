@@ -11,6 +11,7 @@ import {
   type ScanClassification,
   type ScanRecord,
 } from "@/lib/galleryStore";
+import { upsertVenueFromScan } from "@/lib/venueStore";
 import type { AnalysisResult } from "@/lib/schema";
 
 export const runtime = "nodejs";
@@ -150,6 +151,13 @@ export async function POST(request: Request) {
       result: body.result ?? existing.result,
     };
     await redis.set(scanKey, updated);
+    // A venue set or corrected in the edit tab feeds the Restaurants tab.
+    await upsertVenueFromScan(updated.result, {
+      photoUrl: updated.photoUrl,
+      scanId: updated.id,
+      at: updated.at,
+      eventDate: updated.eventDate,
+    });
     const all = await redis.lrange<GalleryEntry>(LIST_KEY, 0, -1);
     const rewritten = all.map((e) =>
       e.id === body.replaceId

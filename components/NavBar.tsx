@@ -34,6 +34,7 @@ export default function NavBar() {
           {item("/", "📷", "Scan")}
           {item("/gallery", "🗂️", "Scans")}
           {item("/my", "🍇", "My Wines")}
+          {item("/restaurants", "🍽️", "Restaurants")}
           {item("/login", "👤", displayName ?? "Login")}
         </div>
       </div>

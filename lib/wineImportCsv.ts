@@ -20,6 +20,11 @@ export interface WineImportEntry {
     wineName: string | null;
     vintage: string | null;
   }[];
+  // Restaurant/bar fields — when venue is set, the wine is also added to
+  // that venue's list in the Restaurants tab.
+  venue: string | null;
+  listedPrice: Money | null; // what the venue charges
+  seenAt: string | null; // YYYY-MM-DD the menu is from (menuDate column)
 }
 
 // Minimal RFC 4180 parser: quoted fields, escaped quotes, CRLF, BOM.
@@ -126,6 +131,27 @@ export function csvToWineEntries(text: string): {
       }
     }
 
+    let listedPrice: Money | null = null;
+    const listedStr = get(row, "listedprice");
+    const listedCurrency = get(row, "listedcurrency") ?? currency;
+    if (listedStr) {
+      const amount = Number(listedStr.replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(amount) && amount > 0 && listedCurrency) {
+        listedPrice = { amount, currency: listedCurrency.toUpperCase() };
+      } else {
+        errors.push(
+          `Row ${idx + 2}: listedPrice needs a number plus a currency — imported without it.`
+        );
+      }
+    }
+
+    const menuDate = get(row, "menudate");
+    if (menuDate && !/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
+      errors.push(
+        `Row ${idx + 2}: menuDate must be YYYY-MM-DD — ignored ("${menuDate}").`
+      );
+    }
+
     const aliases = (get(row, "aliases") ?? "")
       .split(";")
       .map((a) => a.trim())
@@ -151,6 +177,10 @@ export function csvToWineEntries(text: string): {
       marketPriceSource: get(row, "marketpricesource"),
       ratings,
       aliases,
+      venue: get(row, "venue"),
+      listedPrice,
+      seenAt:
+        menuDate && /^\d{4}-\d{2}-\d{2}$/.test(menuDate) ? menuDate : null,
     });
   });
   return { entries, errors };

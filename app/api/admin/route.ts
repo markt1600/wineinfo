@@ -16,6 +16,8 @@ import {
   wineKey,
   type WineCacheEntry,
 } from "@/lib/wineCache";
+import { upsertVenue, type VenueWine } from "@/lib/venueStore";
+import type { Money } from "@/lib/schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,13 +31,17 @@ function pinMatches(pin: string): boolean {
 }
 
 // One imported wine: the cache-entry fields plus optional alias spellings
-// (e.g. how a menu prints the name) that should resolve to the same entry.
+// (e.g. how a menu prints the name) that should resolve to the same entry,
+// and optional venue fields that feed the Restaurants tab.
 interface WineImport extends Partial<WineCacheEntry> {
   aliases?: {
     producer?: string | null;
     wineName?: string | null;
     vintage?: string | null;
   }[];
+  venue?: string | null;
+  listedPrice?: Money | null;
+  seenAt?: string | null; // YYYY-MM-DD the menu is from
 }
 
 // Admin actions: verify the PIN, delete selected scans (card blob, photo
@@ -79,6 +85,7 @@ export async function POST(request: Request) {
     }
     let wines = 0;
     let keysWritten = 0;
+    const byVenue = new Map<string, VenueWine[]>();
     for (const e of entries) {
       if (!e || (!e.producer && !e.wineName)) continue;
       const entry: WineCacheEntry = {
@@ -108,8 +115,54 @@ export async function POST(request: Request) {
         keysWritten++;
       }
       wines++;
+
+      // Rows with a venue also build that restaurant's wine list.
+      const venueName = (e.venue ?? "").trim();
+      if (venueName) {
+        const listed = e.listedPrice ?? null;
+        let priceDeltaPct: number | null = null;
+        if (
+          listed &&
+          entry.marketPrice &&
+          listed.currency === entry.marketPrice.currency &&
+          entry.marketPrice.amount > 0
+        ) {
+          priceDeltaPct = Math.round(
+            ((listed.amount - entry.marketPrice.amount) /
+              entry.marketPrice.amount) *
+              100
+          );
+        }
+        const list = byVenue.get(venueName) ?? [];
+        list.push({
+          producer: entry.producer,
+          wineName: entry.wineName,
+          vintage: entry.vintage,
+          region: entry.region,
+          wineType: entry.wineType,
+          bottleSizeML: null,
+          listedPrice: listed,
+          marketPrice: entry.marketPrice,
+          marketPriceSource: entry.marketPriceSource,
+          priceDeltaPct,
+          ratings: entry.ratings,
+          seenAt:
+            e.seenAt && /^\d{4}-\d{2}-\d{2}$/.test(e.seenAt)
+              ? e.seenAt
+              : new Date().toISOString().slice(0, 10),
+        });
+        byVenue.set(venueName, list);
+      }
     }
-    return Response.json({ ok: true, wines, keysWritten });
+    for (const [venueName, venueWines] of byVenue) {
+      await upsertVenue(venueName, venueWines, null);
+    }
+    return Response.json({
+      ok: true,
+      wines,
+      keysWritten,
+      venues: byVenue.size,
+    });
   }
 
   if (body.action === "delete") {

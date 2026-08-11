@@ -1,5 +1,6 @@
 import { del, put } from "@vercel/blob";
 import { getRedis } from "@/lib/redis";
+import { upsertVenueFromScan } from "@/lib/venueStore";
 import type { AnalysisResult } from "@/lib/schema";
 
 // Shared storage plumbing for the scan gallery (feed list in Redis,
@@ -140,6 +141,13 @@ export async function saveScan(
         result: input.result!,
       };
       await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
+      // Menu scans with a venue name also feed the Restaurants tab.
+      await upsertVenueFromScan(input.result!, {
+        photoUrl,
+        scanId: id,
+        at,
+        eventDate: record.eventDate,
+      });
     }
     const entry: GalleryEntry = {
       ...(hasRecord ? { id } : {}),
