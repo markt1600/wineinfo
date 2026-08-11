@@ -47,6 +47,9 @@ export interface BottleResult {
   ratings: Rating[];
   valueAssessment: string | null; // short judgement of listed vs market price
   notes: string;
+  // User-entered tasting notes (from the edit tab) — never set by the
+  // model, but stored with the scan record and shown on replay.
+  tastingNotes?: string | null;
 }
 
 export interface AnalysisResult {

@@ -100,6 +100,9 @@ tab:
 - **Misidentified** flag: the bottle turns red/unidentified, drops out of the
   best-value pick, and its wine-cache entries are purged so the bad
   identification isn't reused.
+- **Tasting notes**: free-text notes per bottle ("cherry and leather,
+  would buy again"), stored with the scan record and shown with the bottle's
+  details on every replay. Editable any time; clearing the text removes them.
 - **Consumption date** (unpriced bottle lineups only): adjusts the date the
   wines were drunk — a metadata-only update, no re-analysis.
 

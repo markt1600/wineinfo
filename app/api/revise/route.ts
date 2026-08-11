@@ -13,6 +13,7 @@ interface ReviseEdit {
   id: string;
   sizeML?: number;
   misidentified?: boolean;
+  tastingNotes?: string; // "" clears the notes
 }
 
 const ALLOWED_SIZES = new Set([375, 750, 1500, 3000]);
@@ -101,6 +102,15 @@ export async function POST(request: Request) {
 
   const result: AnalysisResult = JSON.parse(JSON.stringify(body.result));
   const byId = new Map(result.bottles.map((b) => [b.id, b]));
+
+  // 0. Tasting notes: plain metadata, applied directly (no model call).
+  for (const edit of body.edits) {
+    if (typeof edit.tastingNotes !== "string") continue;
+    const b = byId.get(edit.id);
+    if (!b) continue;
+    const trimmed = edit.tastingNotes.trim().slice(0, 1000);
+    b.tastingNotes = trimmed || null;
+  }
 
   // 1. Misidentification flags: bottle turns red/unidentified and its
   //    wine data is cleared; suspect cache entries are purged.

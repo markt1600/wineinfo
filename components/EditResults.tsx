@@ -14,6 +14,9 @@ export interface ReviseEdit {
   id: string;
   sizeML?: number;
   misidentified?: boolean;
+  // Present (possibly "") when the user changed the tasting notes;
+  // "" clears them.
+  tastingNotes?: string;
 }
 
 interface Props {
@@ -33,6 +36,7 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sizes, setSizes] = useState<Map<string, number>>(new Map());
   const [flags, setFlags] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState<Map<string, string>>(new Map());
   const [date, setDate] = useState<string>(eventDate ?? "");
 
   const editable = useMemo(
@@ -46,15 +50,21 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
   const edits: ReviseEdit[] = useMemo(() => {
     const out: ReviseEdit[] = [];
     for (const b of editable) {
+      const e: ReviseEdit = { id: b.id };
       const size = sizes.get(b.id);
-      const mis = flags.has(b.id);
-      if (mis) out.push({ id: b.id, misidentified: true });
-      else if (size && size !== originalSize(b.id))
-        out.push({ id: b.id, sizeML: size });
+      if (flags.has(b.id)) e.misidentified = true;
+      else if (size && size !== originalSize(b.id)) e.sizeML = size;
+      const note = notes.get(b.id);
+      if (note !== undefined && note.trim() !== (b.tastingNotes ?? "")) {
+        e.tastingNotes = note.trim();
+      }
+      if (e.misidentified || e.sizeML || e.tastingNotes !== undefined) {
+        out.push(e);
+      }
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, sizes, flags]);
+  }, [editable, sizes, flags, notes]);
 
   const dateChanged = !!eventDate && !!date && date !== eventDate;
   const changeCount = edits.length + (dateChanged ? 1 : 0);
@@ -69,6 +79,7 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
       setOpen(false);
       setSizes(new Map());
       setFlags(new Set());
+      setNotes(new Map());
     } catch (e: any) {
       setError(e?.message ?? "Could not apply changes.");
     } finally {
@@ -89,8 +100,9 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
       {open && (
         <div style={{ marginTop: 14 }}>
           <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: 6 }}>
-            Correct a bottle size (pricing is refreshed for the new size) or
-            flag a wine that was identified incorrectly.
+            Correct a bottle size (pricing is refreshed for the new size),
+            flag a wine that was identified incorrectly, or add your own
+            tasting notes.
           </p>
           {editable.map((b) => {
             const name =
@@ -137,6 +149,17 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
                     Misidentified
                   </label>
                 </div>
+                <textarea
+                  className="edit-notes"
+                  placeholder="📝 Tasting notes (optional) — nose, palate, would you buy again?"
+                  rows={2}
+                  maxLength={1000}
+                  disabled={busy}
+                  value={notes.get(b.id) ?? b.tastingNotes ?? ""}
+                  onChange={(e) =>
+                    setNotes((prev) => new Map(prev).set(b.id, e.target.value))
+                  }
+                />
               </div>
             );
           })}

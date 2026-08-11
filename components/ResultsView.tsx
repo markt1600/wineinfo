@@ -169,6 +169,18 @@ function BottleCard({
         )}
       </dl>
       {bottle.notes && <p className="notes">{bottle.notes}</p>}
+      {bottle.tastingNotes && (
+        <p
+          className="notes"
+          style={{
+            borderLeft: "3px solid var(--accent)",
+            paddingLeft: 10,
+            fontStyle: "italic",
+          }}
+        >
+          📝 {bottle.tastingNotes}
+        </p>
+      )}
     </div>
   );
 }
