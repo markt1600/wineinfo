@@ -124,9 +124,14 @@ main {
     border-bottom: none;
     border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom);
-    /* Own compositing layer — without this, iOS Safari detaches the
-       fixed bar mid-viewport during momentum scrolling when it has a
-       backdrop-filter. */
+    /* iOS Safari detaches fixed elements that carry a backdrop-filter
+       during momentum scrolling, leaving the bar floating mid-screen.
+       The translateZ compositing-layer hack only made it rarer — the
+       real cure is no blur on the fixed bar at all: solid background,
+       filter off. Keep the layer hints as belt-and-braces. */
+    background: #fff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
     -webkit-backface-visibility: hidden;
