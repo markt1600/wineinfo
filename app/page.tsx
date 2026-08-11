@@ -123,6 +123,8 @@ export default function Home() {
             setProgress(null);
           } else if (msg.type === "result") {
             setResult(msg.data as AnalysisResult);
+            // Server already saved the scan; the card render upgrades it.
+            if (msg.scanId) setSavedScanId(msg.scanId);
             setStatus(null);
             setProgress(null);
           } else if (msg.type === "error") {
@@ -337,7 +339,7 @@ export default function Home() {
         <ResultsView
           imageDataUrl={prepared.dataUrl}
           result={result}
-          saveMode={savedScanId && revision > 0 ? "replace" : "new"}
+          saveMode={savedScanId ? "replace" : "new"}
           scanId={savedScanId}
           revision={revision}
           eventDate={

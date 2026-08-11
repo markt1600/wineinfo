@@ -1,5 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { analysisJsonSchema, type AnalysisResult } from "@/lib/schema";
+import { readSession } from "@/lib/auth";
+import { saveScan } from "@/lib/galleryStore";
+import { buildScanCaption } from "@/lib/totals";
 import {
   cacheEnabled,
   cacheGetMany,
@@ -529,10 +532,30 @@ export async function POST(request: Request) {
           .join("");
 
         const data = extractJson(text);
-        send({ type: "progress", pct: 100 });
-        send({ type: "result", data });
-
         await writeBackCache(data, cacheHitKeys, lookupKeysByBottleId);
+
+        // Fire-and-forget: persist the scan server-side BEFORE replying, so
+        // the result survives even if the user already closed the tab. The
+        // photo doubles as the feed thumbnail until the browser renders the
+        // summary card and replaces it (via replaceId).
+        let scanId: string | null = null;
+        try {
+          const session = readSession(request.headers.get("cookie"));
+          const saved = await saveScan({
+            photoBytes: Buffer.from(body.image, "base64"),
+            result: data,
+            caption: buildScanCaption(data),
+            sceneType: data.sceneType,
+            postedBy: session?.displayName ?? "Guest",
+            username: session?.username ?? "guest",
+          });
+          scanId = saved?.id ?? null;
+        } catch (err) {
+          console.error("server-side scan save failed:", err);
+        }
+
+        send({ type: "progress", pct: 100 });
+        send({ type: "result", data, scanId });
       } catch (err: any) {
         console.error("analyze failed:", err);
         send({

@@ -4,10 +4,9 @@ import { readSession } from "@/lib/auth";
 import {
   LIST_KEY,
   SCAN_KEY_PREFIX,
-  USER_SCANS_MAX,
   galleryEnabled,
   getBlobToken,
-  userScansKey,
+  saveScan,
   type GalleryEntry,
   type ScanClassification,
   type ScanRecord,
@@ -161,7 +160,13 @@ export async function POST(request: Request) {
     pipeline.del(LIST_KEY);
     if (rewritten.length > 0) pipeline.rpush(LIST_KEY, ...rewritten);
     await pipeline.exec();
-    if (existing.cardUrl && existing.cardUrl !== card.url) {
+    // Never delete the archived photo — it doubles as the thumbnail on
+    // fire-and-forget saves until the first card render replaces it.
+    if (
+      existing.cardUrl &&
+      existing.cardUrl !== card.url &&
+      existing.cardUrl !== existing.photoUrl
+    ) {
       del(existing.cardUrl, { token }).catch(() => {});
     }
     return Response.json({
@@ -170,113 +175,18 @@ export async function POST(request: Request) {
     });
   }
 
-  const id = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const uploaded: string[] = [];
-
-  try {
-    const card = await put(`gallery/${id}-card.jpg`, cardBytes, {
-      access: "public",
-      contentType: "image/jpeg",
-      addRandomSuffix: true,
-      token,
-    });
-    uploaded.push(card.url);
-
-    let photoUrl = "";
-    if (photoBytes) {
-      const photo = await put(`gallery/${id}-photo.jpg`, photoBytes, {
-        access: "public",
-        contentType: "image/jpeg",
-        addRandomSuffix: true,
-        token,
-      });
-      uploaded.push(photo.url);
-      photoUrl = photo.url;
-    }
-
-    const at = new Date().toISOString();
-    const caption = (body.caption ?? "").slice(0, 220);
-    const sceneType = body.sceneType ?? "other";
-
-    // Attribution: signed-in user's display name, else Guest.
-    const session = readSession(request.headers.get("cookie"));
-    const postedBy = session?.displayName ?? "Guest";
-    const username = session?.username ?? "guest";
-
-    // Classification: priced scenes (store shelf, menu) are wines "Seen";
-    // unpriced bottle lineups are wines "Consumed".
-    const hasPrices = body.result
-      ? body.result.bottles.some((b) => b.listedPrice)
-      : sceneType === "shelf_with_prices" || sceneType === "wine_menu";
-    const classification: ScanClassification = hasPrices ? "Seen" : "Consumed";
-
-    const redis = getRedis()!;
-    // Full record for the replay view, when the client sent the analysis.
-    // The entry only carries an id when the record actually exists —
-    // otherwise the gallery would link to a replay that 404s.
-    const hasRecord = !!(body.result && photoUrl);
-    if (hasRecord) {
-      const record: ScanRecord = {
-        id,
-        cardUrl: card.url,
-        photoUrl,
-        caption,
-        sceneType,
-        at,
-        postedBy,
-        username,
-        classification,
-        eventDate: at.slice(0, 10),
-        result: body.result!,
-      };
-      await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
-    }
-    const entry: GalleryEntry = {
-      ...(hasRecord ? { id } : {}),
-      url: card.url,
-      caption,
-      sceneType,
-      at,
-      postedBy,
-      username,
-      classification,
-      eventDate: at.slice(0, 10),
-    };
-
-    await redis.lpush(LIST_KEY, entry);
-    // Index the scan in the poster's personal history.
-    if (hasRecord && username !== "guest") {
-      await redis.lpush(userScansKey(username), id);
-      await redis.ltrim(userScansKey(username), 0, USER_SCANS_MAX - 1);
-    }
-    // Trim the public feed. Guests' aged-out scans are fully deleted;
-    // signed-in users' scans keep their record + images so they remain
-    // available in "My Wines" history.
-    const evicted = await redis.lrange<GalleryEntry>(LIST_KEY, MAX_ENTRIES, -1);
-    await redis.ltrim(LIST_KEY, 0, MAX_ENTRIES - 1);
-    for (const e of evicted) {
-      if (e.username && e.username !== "guest") continue;
-      del(e.url, { token }).catch((err) =>
-        console.error("gallery blob delete failed:", err)
-      );
-      if (e.id) {
-        const rec = await redis
-          .get<ScanRecord>(`${SCAN_KEY_PREFIX}${e.id}`)
-          .catch(() => null);
-        if (rec?.photoUrl) {
-          del(rec.photoUrl, { token }).catch(() => {});
-        }
-        await redis.del(`${SCAN_KEY_PREFIX}${e.id}`).catch(() => {});
-      }
-    }
-
-    return Response.json({ ok: true, entry });
-  } catch (err) {
-    console.error("gallery save failed:", err);
-    // Don't leave orphaned blobs if we couldn't record the entry.
-    await Promise.all(
-      uploaded.map((u) => del(u, { token }).catch(() => {}))
-    );
+  const session = readSession(request.headers.get("cookie"));
+  const saved = await saveScan({
+    cardBytes,
+    photoBytes,
+    result: body.result ?? null,
+    caption: body.caption ?? "",
+    sceneType: body.sceneType ?? "other",
+    postedBy: session?.displayName ?? "Guest",
+    username: session?.username ?? "guest",
+  });
+  if (!saved) {
     return Response.json({ error: "Could not save scan" }, { status: 500 });
   }
+  return Response.json({ ok: true, entry: saved.entry });
 }

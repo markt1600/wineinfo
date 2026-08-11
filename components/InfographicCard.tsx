@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
-import { formatMoney, formatTotals, marketTotals } from "@/lib/totals";
+import {
+  buildScanCaption,
+  formatMoney,
+  formatTotals,
+  marketTotals,
+} from "@/lib/totals";
 
 // Phone-sized (9:16) shareable infographic: annotated photo on top, a
 // compact per-wine info list, and the total market value of everything
@@ -20,24 +25,6 @@ interface Props {
   saveMode?: "new" | "replace" | "off";
   scanId?: string | null;
   onSaved?: (id: string | null) => void;
-}
-
-// "Opus One 2019, Caymus 2021 +2 more · $412 at market"
-function buildCaption(result: AnalysisResult): string {
-  const names = result.bottles
-    .filter((b) => b.identified)
-    .map((b) =>
-      [b.producer, b.wineName, b.vintage].filter(Boolean).join(" ")
-    )
-    .filter(Boolean);
-  const shown = names.slice(0, 3);
-  const more = names.length - shown.length;
-  const nameStr =
-    shown.length > 0
-      ? shown.join(", ") + (more > 0 ? ` +${more} more` : "")
-      : `${result.bottles.length} wine${result.bottles.length === 1 ? "" : "s"}`;
-  const totalStr = formatTotals(marketTotals(result));
-  return totalStr ? `${nameStr} · ${totalStr} at market` : nameStr;
 }
 
 function truncate(
@@ -158,7 +145,7 @@ export default function InfographicCard({
           image: dataUrl.split(",")[1],
           photo: photo?.split(",")[1],
           result,
-          caption: buildCaption(result),
+          caption: buildScanCaption(result),
           sceneType: result.sceneType,
           ...(saveMode === "replace" && scanId ? { replaceId: scanId } : {}),
         }),

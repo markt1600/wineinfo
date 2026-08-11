@@ -31,8 +31,14 @@ gold. You can download the annotated image.
 - Structured outputs (`output_config.format`) constrain the answer to a JSON
   schema including per-bottle pixel bounding boxes, prices, ratings, and a
   best-value verdict.
-- Results stream back over server-sent events with progress updates, since a
-  research-heavy request can take a few minutes.
+- Results stream back over server-sent events with progress updates (live
+  search queries and an approximate percentage), since a research-heavy
+  request can take a few minutes.
+- **Fire-and-forget:** the server saves every completed analysis (photo, full
+  results, attribution, classification) before replying, so a scan survives
+  even if the tab is closed mid-processing. The photo serves as the feed
+  thumbnail until the browser renders the summary card and upgrades the entry
+  in place.
 - Server-side refusal fallbacks are enabled, so a false-positive safety decline
   is transparently re-served by Anthropic's recommended fallback model.
 - **Wine database (optional but recommended):** previously researched wines
@@ -122,6 +128,17 @@ date).
   first (newest first), then Seen, each linking to the full report. Signed-in
   users' scans are kept even after they age off the public feed (up to 500
   per user); guests' aged-out scans are deleted as before.
+
+## Sharing & mobile
+
+- **Link previews:** the app ships an Open Graph card (wine bottles + the app
+  name) rendered at `/opengraph-image`, so pasting the link into WhatsApp,
+  iMessage, Slack, or X shows a proper preview. Set `NEXT_PUBLIC_SITE_URL` if
+  the auto-detected production URL isn't right.
+- **Native feel on phones:** bottom tab-bar navigation with safe-area
+  insets, app icons and a web manifest (installable via "Add to Home Screen"
+  as a standalone app), no tap-highlight flashes or accidental
+  text-selection, and iOS-calibrated input sizes that avoid focus zoom.
 
 ## Cost controls
 

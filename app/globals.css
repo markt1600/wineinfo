@@ -28,6 +28,24 @@ body {
   line-height: 1.47;
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
+  /* Native-app feel on phones */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+button,
+.btn,
+.nav-item,
+.gallery-item,
+.my-row {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+img {
+  -webkit-user-drag: none;
 }
 
 main {

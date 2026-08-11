@@ -33,3 +33,19 @@ export function formatTotals(totals: Map<string, number>): string | null {
     .map(([cur, amt]) => formatMoney(amt, cur))
     .join(" + ");
 }
+
+// Feed caption: "Opus One 2019, Caymus 2021 +2 more · $412 at market"
+export function buildScanCaption(result: AnalysisResult): string {
+  const names = result.bottles
+    .filter((b) => b.identified)
+    .map((b) => [b.producer, b.wineName, b.vintage].filter(Boolean).join(" "))
+    .filter(Boolean);
+  const shown = names.slice(0, 3);
+  const more = names.length - shown.length;
+  const nameStr =
+    shown.length > 0
+      ? shown.join(", ") + (more > 0 ? ` +${more} more` : "")
+      : `${result.bottles.length} wine${result.bottles.length === 1 ? "" : "s"}`;
+  const totalStr = formatTotals(marketTotals(result));
+  return totalStr ? `${nameStr} · ${totalStr} at market` : nameStr;
+}
