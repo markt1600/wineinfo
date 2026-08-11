@@ -67,6 +67,10 @@ export interface AnalysisResult {
     reasoning: string;
   };
   summary: string;
+  // Venue name for menu scans (restaurant, bar, …) — auto-detected from the
+  // menu itself when printed on it, user-editable in the edit tab. Optional
+  // because records saved before this field existed lack it.
+  venue?: string | null;
 }
 
 // JSON schema for structured outputs (output_config.format).
@@ -207,6 +211,11 @@ export const analysisJsonSchema = {
       additionalProperties: false,
     },
     summary: { type: "string" },
+    venue: {
+      type: ["string", "null"],
+      description:
+        "For wine_menu scenes: the venue name (restaurant, bar, hotel) if it is printed on the menu — header, logo, footer. Null when not visible or not a menu.",
+    },
   },
   required: [
     "sceneType",
@@ -215,6 +224,7 @@ export const analysisJsonSchema = {
     "bottles",
     "bestValue",
     "summary",
+    "venue",
   ],
   additionalProperties: false,
 } as const;

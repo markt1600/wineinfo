@@ -128,13 +128,21 @@ function ScanView() {
               ? undefined
               : (record.eventDate ?? record.at.slice(0, 10))
           }
-          onRevise={async (edits: ReviseEdit[], newEventDate?: string) => {
+          onRevise={async (
+            edits: ReviseEdit[],
+            newEventDate?: string,
+            newVenue?: string
+          ) => {
             let updated = record;
-            if (edits.length > 0) {
+            if (edits.length > 0 || newVenue !== undefined) {
               const res = await fetch("/api/revise", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ result: record.result, edits }),
+                body: JSON.stringify({
+                  result: record.result,
+                  edits,
+                  venue: newVenue,
+                }),
               });
               const data = await res.json().catch(() => ({}));
               if (!res.ok) throw new Error(data?.error ?? "Revision failed");

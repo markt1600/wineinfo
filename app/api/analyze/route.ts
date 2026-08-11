@@ -53,6 +53,8 @@ First classify the scene:
 - wine_menu: a printed or written wine list / menu
 - other: not wine related
 
+venue: for wine_menu scenes, look for the venue's name printed on the menu itself — header, logo, footer, watermark — and set "venue" to it (e.g. "Le Bernardin", "The Oak Room Bar"). Set null when no venue name is visible or the scene is not a menu. Never guess a venue from the wines alone.
+
 For every DISTINCT wine you can see (bottle or menu line item), create ONE entry in "bottles":
 - One entry per distinct wine, not per physical bottle: shelves often hold several identical bottles of the same wine (multiple facings). Box the clearest bottle for that wine, and when there are multiple facings mention the count in notes (e.g. "3 facings on shelf"). Never research the same wine more than once.
 - Give it a short id ("b1", "b2", ...).

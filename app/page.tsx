@@ -419,12 +419,16 @@ export default function Home() {
             if (id) setSavedScanId(id);
             setGalleryRefresh((n) => n + 1);
           }}
-          onRevise={async (edits: ReviseEdit[], newEventDate?: string) => {
-            if (edits.length > 0) {
+          onRevise={async (
+            edits: ReviseEdit[],
+            newEventDate?: string,
+            newVenue?: string
+          ) => {
+            if (edits.length > 0 || newVenue !== undefined) {
               const res = await fetch("/api/revise", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ result, edits }),
+                body: JSON.stringify({ result, edits, venue: newVenue }),
               });
               const data = await res.json().catch(() => ({}));
               if (!res.ok) throw new Error(data?.error ?? "Revision failed");

@@ -103,6 +103,9 @@ tab:
 - **Tasting notes**: free-text notes per bottle ("cherry and leather,
   would buy again"), stored with the scan record and shown with the bottle's
   details on every replay. Editable any time; clearing the text removes them.
+- **Venue** (menu scans): the restaurant/bar the wine list is from —
+  auto-detected when the venue's name is printed on the menu itself, and
+  editable here. Shown with the results and on the summary card.
 - **Consumption date** (unpriced bottle lineups only): adjusts the date the
   wines were drunk — a metadata-only update, no re-analysis.
 

@@ -95,16 +95,24 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     result?: AnalysisResult;
     edits?: ReviseEdit[];
+    venue?: string; // "" clears the venue name
   };
-  if (!body?.result || !Array.isArray(body.edits) || body.edits.length === 0) {
+  const edits = Array.isArray(body?.edits) ? body.edits : [];
+  const hasVenueEdit = typeof body?.venue === "string";
+  if (!body?.result || (edits.length === 0 && !hasVenueEdit)) {
     return Response.json({ error: "Missing result or edits" }, { status: 400 });
   }
-
   const result: AnalysisResult = JSON.parse(JSON.stringify(body.result));
   const byId = new Map(result.bottles.map((b) => [b.id, b]));
 
-  // 0. Tasting notes: plain metadata, applied directly (no model call).
-  for (const edit of body.edits) {
+  // 0a. Venue name (menu scans): plain metadata, applied directly.
+  if (hasVenueEdit) {
+    const trimmed = body.venue!.trim().slice(0, 120);
+    result.venue = trimmed || null;
+  }
+
+  // 0b. Tasting notes: plain metadata, applied directly (no model call).
+  for (const edit of edits) {
     if (typeof edit.tastingNotes !== "string") continue;
     const b = byId.get(edit.id);
     if (!b) continue;
@@ -114,7 +122,7 @@ export async function POST(request: Request) {
 
   // 1. Misidentification flags: bottle turns red/unidentified and its
   //    wine data is cleared; suspect cache entries are purged.
-  for (const edit of body.edits) {
+  for (const edit of edits) {
     if (!edit.misidentified) continue;
     const b = byId.get(edit.id);
     if (!b) continue;
@@ -151,7 +159,7 @@ export async function POST(request: Request) {
   }
 
   // 2. Size changes on still-identified bottles → re-price.
-  const sizeEdits = body.edits.filter((e) => {
+  const sizeEdits = edits.filter((e) => {
     const b = byId.get(e.id);
     return (
       b &&

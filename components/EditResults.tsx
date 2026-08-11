@@ -24,12 +24,18 @@ interface Props {
   // Current consumption date (YYYY-MM-DD). Provided only for Consumed
   // scans that are persisted — enables the date editor.
   eventDate?: string | null;
-  onConfirm: (edits: ReviseEdit[], newEventDate?: string) => Promise<void>;
+  // newVenue is set when the user changed the venue name ("" clears it).
+  onConfirm: (
+    edits: ReviseEdit[],
+    newEventDate?: string,
+    newVenue?: string
+  ) => Promise<void>;
 }
 
 // The "Edit results" tab: correct bottle sizes (re-prices for the new
-// size), flag misidentified bottles (they turn red/unidentified), and
-// adjust the consumption date on unpriced bottle lineups.
+// size), flag misidentified bottles (they turn red/unidentified), add
+// tasting notes, name the venue on menu scans, and adjust the consumption
+// date on unpriced bottle lineups.
 export default function EditResults({ result, eventDate, onConfirm }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -38,6 +44,9 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<Map<string, string>>(new Map());
   const [date, setDate] = useState<string>(eventDate ?? "");
+  const [venue, setVenue] = useState<string>(result.venue ?? "");
+
+  const isMenu = result.sceneType === "wine_menu";
 
   const editable = useMemo(
     () => result.bottles.filter((b) => b.identified),
@@ -67,15 +76,21 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
   }, [editable, sizes, flags, notes]);
 
   const dateChanged = !!eventDate && !!date && date !== eventDate;
-  const changeCount = edits.length + (dateChanged ? 1 : 0);
+  const venueChanged = isMenu && venue.trim() !== (result.venue ?? "");
+  const changeCount =
+    edits.length + (dateChanged ? 1 : 0) + (venueChanged ? 1 : 0);
 
-  if (editable.length === 0 && eventDate == null) return null;
+  if (editable.length === 0 && eventDate == null && !isMenu) return null;
 
   const confirm = async () => {
     setBusy(true);
     setError(null);
     try {
-      await onConfirm(edits, dateChanged ? date : undefined);
+      await onConfirm(
+        edits,
+        dateChanged ? date : undefined,
+        venueChanged ? venue.trim() : undefined
+      );
       setOpen(false);
       setSizes(new Map());
       setFlags(new Set());
@@ -104,6 +119,25 @@ export default function EditResults({ result, eventDate, onConfirm }: Props) {
             flag a wine that was identified incorrectly, or add your own
             tasting notes.
           </p>
+          {isMenu && (
+            <div className="edit-row">
+              <div className="edit-name">📍 Venue</div>
+              <input
+                type="text"
+                className="currency"
+                style={{ margin: 0 }}
+                placeholder="Restaurant, bar, hotel…"
+                maxLength={120}
+                disabled={busy}
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+              />
+              <p style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: 6 }}>
+                Where this wine list is from — detected from the menu when
+                printed on it.
+              </p>
+            </div>
+          )}
           {editable.map((b) => {
             const name =
               [b.producer, b.wineName, b.vintage].filter(Boolean).join(" ") ||

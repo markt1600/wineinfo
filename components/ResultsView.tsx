@@ -193,7 +193,11 @@ interface Props {
   revision?: number; // bumps after an edit → summary card regenerates + re-saves
   eventDate?: string | null; // enables the consumption-date editor (Consumed scans)
   onSaved?: (id: string | null) => void;
-  onRevise?: (edits: ReviseEdit[], newEventDate?: string) => Promise<void>;
+  onRevise?: (
+    edits: ReviseEdit[],
+    newEventDate?: string,
+    newVenue?: string
+  ) => Promise<void>;
   afterImage?: React.ReactNode; // e.g. the currency-confirmation card
 }
 
@@ -238,6 +242,11 @@ export default function ResultsView({
       {afterImage}
 
       <div className="card">
+        {result.venue && (
+          <p style={{ fontWeight: 600, marginBottom: 8 }}>
+            📍 {result.venue}
+          </p>
+        )}
         <p className="summary">{result.summary}</p>
         {bestValueId && (
           <div className="best-banner">

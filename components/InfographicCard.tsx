@@ -202,11 +202,14 @@ export default function InfographicCard({
         wine_menu: "Wine menu",
         other: "Photo",
       };
-      ctx.fillText(
-        `${sceneLabel[result.sceneType] ?? "Photo"} · ${date}`,
-        PAD,
-        PAD + 110
-      );
+      const subtitle = [
+        result.venue,
+        sceneLabel[result.sceneType] ?? "Photo",
+        date,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      ctx.fillText(truncate(ctx, subtitle, W - PAD * 2), PAD, PAD + 110);
 
       // The original (un-annotated) photo, letterboxed into a rounded frame
       const photoTop = PAD + 150;
