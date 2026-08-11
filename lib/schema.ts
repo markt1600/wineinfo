@@ -76,6 +76,10 @@ export interface AnalysisResult {
 // JSON schema for structured outputs (output_config.format).
 // Structured-outputs rules: every object needs additionalProperties:false and
 // a required list; no numeric/string constraints.
+// The API also caps union-typed parameters (type arrays / anyOf) at 16 per
+// schema — this schema sits at 15, so think twice before adding another
+// nullable field. ratings[].url and valueAssessment use "" as their empty
+// sentinel (normalized back to null in the analyze route) for this reason.
 const moneySchema = {
   type: ["object", "null"],
   properties: {
@@ -168,13 +172,20 @@ export const analysisJsonSchema = {
                   description:
                     "true when the rating is for the exact vintage seen in the photo; false when it is for the wine in general or a different vintage",
                 },
-                url: { type: ["string", "null"] },
+                url: {
+                  type: "string",
+                  description: "Rating URL, or empty string when none",
+                },
               },
               required: ["source", "score", "vintageMatch", "url"],
               additionalProperties: false,
             },
           },
-          valueAssessment: { type: ["string", "null"] },
+          valueAssessment: {
+            type: "string",
+            description:
+              "Short judgement of listed vs market price; empty string when there is no listed price to judge",
+          },
           notes: { type: "string" },
         },
         required: [

@@ -158,14 +158,29 @@ interface CacheLookupInput {
   }[];
 }
 
+// The schema uses "" instead of null for ratings[].url and valueAssessment
+// (the API caps union-typed schema parameters at 16) — restore nulls here so
+// the rest of the app keeps its string|null contract.
+function normalizeResult(result: AnalysisResult): AnalysisResult {
+  for (const b of result.bottles ?? []) {
+    if (!b.valueAssessment) b.valueAssessment = null;
+    for (const r of b.ratings ?? []) {
+      if (!r.url) r.url = null;
+    }
+  }
+  return result;
+}
+
 function extractJson(text: string): AnalysisResult {
   try {
-    return JSON.parse(text) as AnalysisResult;
+    return normalizeResult(JSON.parse(text) as AnalysisResult);
   } catch {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      return JSON.parse(text.slice(start, end + 1)) as AnalysisResult;
+      return normalizeResult(
+        JSON.parse(text.slice(start, end + 1)) as AnalysisResult
+      );
     }
     throw new Error("Model response did not contain valid JSON");
   }
