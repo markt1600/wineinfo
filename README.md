@@ -144,12 +144,14 @@ select and delete saved scans. The footer link to it only appears for the
 owner's Google login — the account whose verified email matches `ADMIN_EMAIL`
 (the page itself stays PIN-protected regardless).
 
-The admin API also supports bulk-importing pre-researched wines straight
-into the Redis wine cache (`POST /api/admin` with
-`{pin, action: "import_wines", entries: [...]}`) — each entry takes the
-wine-cache fields plus optional `aliases` (alternate spellings, e.g. as a
-menu prints the name). Imports only seed the cache so future scans skip web
-research; they never create gallery or scan-history entries.
+The admin page also has a **wine import**: upload a CSV of pre-researched
+wines (template downloadable on the page — name, region, market price,
+Vivino/CellarTracker ratings, plus optional alias spellings such as how a
+menu prints the name) and they are written straight into the Redis wine
+cache, so future scans of those wines skip web research entirely. Imports
+only seed the cache — they never create gallery or scan-history entries.
+The same thing is scriptable via `POST /api/admin` with
+`{pin, action: "import_wines", entries: [...]}`.
 
 ## Sharing & mobile
 

@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import {
+  csvToWineEntries,
+  type WineImportEntry,
+} from "@/lib/wineImportCsv";
 
 interface GalleryEntry {
   id?: string;
@@ -19,6 +23,10 @@ export default function AdminPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [importEntries, setImportEntries] = useState<WineImportEntry[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   const loadEntries = async () => {
     const res = await fetch("/api/gallery");
@@ -89,6 +97,59 @@ export default function AdminPage() {
     }
   };
 
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportResult(null);
+    try {
+      const { entries, errors } = csvToWineEntries(await file.text());
+      setImportEntries(entries);
+      setImportErrors(errors);
+      setImportFileName(file.name);
+    } catch {
+      setImportEntries([]);
+      setImportErrors(["Could not read that file."]);
+      setImportFileName(file.name);
+    }
+  };
+
+  const runImport = async () => {
+    if (importEntries.length === 0) return;
+    setBusy(true);
+    setImportResult(null);
+    try {
+      let wines = 0;
+      let keys = 0;
+      // The API caps a request at 200 entries — send in batches of 100.
+      for (let i = 0; i < importEntries.length; i += 100) {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pin,
+            action: "import_wines",
+            entries: importEntries.slice(i, i + 100),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? "Import failed");
+        wines += data.wines ?? 0;
+        keys += data.keysWritten ?? 0;
+      }
+      setImportResult(
+        `✓ Imported ${wines} wine${wines === 1 ? "" : "s"} (${keys} cache keys). Future scans of these wines skip web research.`
+      );
+      setImportEntries([]);
+      setImportErrors([]);
+      setImportFileName(null);
+    } catch (e: any) {
+      setImportResult(e?.message ?? "Import failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main>
       <header className="app">
@@ -121,6 +182,7 @@ export default function AdminPage() {
           {message && <div className="error">{message}</div>}
         </div>
       ) : (
+        <>
         <div className="card">
           <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>
             🗑️ Delete scans
@@ -170,6 +232,60 @@ export default function AdminPage() {
             </p>
           )}
         </div>
+
+        <div className="card">
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 4 }}>
+            📥 Import wines
+          </h2>
+          <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: 12 }}>
+            Upload a CSV of pre-researched wines to seed the wine database —
+            future scans of these wines skip web research entirely. Nothing
+            is added to the public feed or anyone&apos;s scan history.{" "}
+            <a href="/wine-import-template.csv" download>
+              Download the CSV template
+            </a>
+            .
+          </p>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            disabled={busy}
+            onChange={onImportFile}
+          />
+          {importFileName && (
+            <p style={{ fontSize: "0.9rem", marginTop: 10 }}>
+              <strong>{importFileName}</strong>:{" "}
+              {importEntries.length} wine
+              {importEntries.length === 1 ? "" : "s"} ready to import.
+            </p>
+          )}
+          {importErrors.map((err, i) => (
+            <p
+              key={i}
+              style={{ color: "#d70015", fontSize: "0.82rem", marginTop: 6 }}
+            >
+              {err}
+            </p>
+          ))}
+          {importEntries.length > 0 && (
+            <button
+              className="btn"
+              style={{ marginTop: 12 }}
+              disabled={busy}
+              onClick={runImport}
+            >
+              {busy
+                ? "Importing…"
+                : `Import ${importEntries.length} wine${importEntries.length === 1 ? "" : "s"}`}
+            </button>
+          )}
+          {importResult && (
+            <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginTop: 10 }}>
+              {importResult}
+            </p>
+          )}
+        </div>
+        </>
       )}
     </main>
   );
