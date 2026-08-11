@@ -114,6 +114,14 @@ const TYPE_FILTERS: ("All" | TypeBucket)[] = [
   "Rosé",
 ];
 
+const SORT_OPTIONS = [
+  { key: "default", label: "Default" },
+  { key: "price", label: "Price" },
+  { key: "delta", label: "Markup / discount" },
+] as const;
+type SortKey = (typeof SORT_OPTIONS)[number]["key"];
+type SortDir = "asc" | "desc";
+
 function DeltaLabel({ pct }: { pct: number }) {
   if (Math.abs(pct) < 1)
     return <span style={{ color: "var(--muted)" }}>≈ market</span>;
@@ -188,6 +196,8 @@ function VenueDetail({ slug }: { slug: string }) {
   const [type, setType] = useState<(typeof TYPE_FILTERS)[number]>("All");
   const [price, setPrice] =
     useState<(typeof PRICE_BUCKETS)[number]["key"]>("any");
+  const [sortBy, setSortBy] = useState<SortKey>("default");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   useEffect(() => {
     let cancelled = false;
@@ -228,7 +238,7 @@ function VenueDetail({ slug }: { slug: string }) {
   const filtered = useMemo(() => {
     if (!venue) return [];
     const bucket = PRICE_BUCKETS.find((b) => b.key === price)!;
-    return venue.wines.filter((w) => {
+    const rows = venue.wines.filter((w) => {
       if (type !== "All" && typeBucket(w.wineType) !== type) return false;
       if (bucket.key !== "any") {
         const amount = w.listedPrice?.amount;
@@ -237,7 +247,20 @@ function VenueDetail({ slug }: { slug: string }) {
       }
       return true;
     });
-  }, [venue, type, price]);
+    if (sortBy === "default") return rows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    const value = (w: VenueWine): number | null =>
+      sortBy === "price" ? (w.listedPrice?.amount ?? null) : w.priceDeltaPct;
+    // Wines missing the sorted field always sink to the bottom, in either direction.
+    return [...rows].sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * dir;
+    });
+  }, [venue, type, price, sortBy, sortDir]);
 
   const back = () => {
     if (window.history.length > 1) router.back();
@@ -374,6 +397,49 @@ function VenueDetail({ slug }: { slug: string }) {
               {b.label}
             </button>
           ))}
+        </div>
+        <div className="venue-filters">
+          {SORT_OPTIONS.map((s) => (
+            <button
+              key={s.key}
+              className={`chip${sortBy === s.key ? " active" : ""}`}
+              onClick={() =>
+                setSortBy((prev) => {
+                  // Tapping the already-active sort flips its direction
+                  // instead of doing nothing.
+                  if (prev === s.key && s.key !== "default") {
+                    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                  } else {
+                    setSortDir("asc");
+                  }
+                  return s.key;
+                })
+              }
+            >
+              {s.label}
+              {sortBy === s.key && s.key !== "default" && (
+                <span aria-hidden="true">
+                  {" "}
+                  {sortDir === "asc" ? "↑" : "↓"}
+                </span>
+              )}
+            </button>
+          ))}
+          {sortBy !== "default" && (
+            <button
+              className="chip"
+              onClick={() =>
+                setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+              }
+              aria-label={
+                sortDir === "asc"
+                  ? "Sort descending instead"
+                  : "Sort ascending instead"
+              }
+            >
+              {sortDir === "asc" ? "Low → High" : "High → Low"}
+            </button>
+          )}
         </div>
         {filtered.length === 0 && (
           <p style={{ color: "var(--muted)" }}>

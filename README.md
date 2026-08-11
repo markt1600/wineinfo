@@ -165,7 +165,10 @@ restaurant shows:
 - Its full wine list in text form — listed price, market price,
   markup/discount, and ratings for each wine — filterable by **type**
   (red / white / sparkling / rosé) and **listed price** (< 100, 100–500,
-  500–1,000, or any price).
+  500–1,000, or any price), and **sortable by price or by
+  markup/discount %** in either ascending or descending order (tap the
+  active sort chip, or the direction button, to flip it). Sorting
+  applies on top of whatever filters are selected.
 - **🏆 Top value**: the 5 wines with the best listed-vs-market percentage.
 - **⭐ Top rated**: the 5 highest-rated wines (Vivino/CellarTracker/critic
   scores normalized to a common scale).
