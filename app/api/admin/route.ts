@@ -42,6 +42,7 @@ interface WineImport extends Partial<WineCacheEntry> {
   venue?: string | null;
   listedPrice?: Money | null;
   seenAt?: string | null; // YYYY-MM-DD the menu is from
+  sizeML?: number | null; // bottle size at the venue (375 = half bottle)
 }
 
 // Admin actions: verify the PIN, delete selected scans (card blob, photo
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
           vintage: entry.vintage,
           region: entry.region,
           wineType: entry.wineType,
-          bottleSizeML: null,
+          bottleSizeML: e.sizeML ?? null,
           listedPrice: listed,
           marketPrice: entry.marketPrice,
           marketPriceSource: entry.marketPriceSource,

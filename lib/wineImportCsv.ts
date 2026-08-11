@@ -25,6 +25,7 @@ export interface WineImportEntry {
   venue: string | null;
   listedPrice: Money | null; // what the venue charges
   seenAt: string | null; // YYYY-MM-DD the menu is from (menuDate column)
+  sizeML: number | null; // bottle size (375 = half); null/blank = 750
 }
 
 // Minimal RFC 4180 parser: quoted fields, escaped quotes, CRLF, BOM.
@@ -181,6 +182,12 @@ export function csvToWineEntries(text: string): {
       listedPrice,
       seenAt:
         menuDate && /^\d{4}-\d{2}-\d{2}$/.test(menuDate) ? menuDate : null,
+      sizeML: (() => {
+        const s = get(row, "sizeml");
+        if (!s) return null;
+        const n = Number(s.replace(/[^0-9]/g, ""));
+        return Number.isFinite(n) && n > 0 ? n : null;
+      })(),
     });
   });
   return { entries, errors };
