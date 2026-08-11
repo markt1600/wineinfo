@@ -68,3 +68,15 @@ export async function cacheSet(
     console.error("wine cache write failed:", err);
   }
 }
+
+// Used when a user flags a wine as misidentified — its cached research
+// is suspect and must not be served to future scans.
+export async function cacheDelete(key: string): Promise<void> {
+  const r = getRedis();
+  if (!r) return;
+  try {
+    await r.del(key);
+  } catch (err) {
+    console.error("wine cache delete failed:", err);
+  }
+}

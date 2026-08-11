@@ -55,6 +55,7 @@ For every DISTINCT wine you can see (bottle or menu line item), create ONE entry
 - Give it a short id ("b1", "b2", ...).
 - boundingBox: the pixel coordinates of the bottle (or the menu line) in the submitted image, top-left origin. Coordinates map 1:1 to the image pixels. Provide a box for every entry you can locate visually; use null only if you truly cannot localize it.
 - Read the label or menu text carefully (producer, cuvée, vintage, appellation).
+- bottleSizeML: the bottle size in mL when discernible from the bottle shape, label, or tag text (375, 750, 1500, 3000); use 750 when standard or unclear. marketPriceEstimated: false unless you had to approximate the market price rather than find it.
 - PRICE TAGS ARE A FIRST-CLASS IDENTIFICATION SOURCE: in stores, shelf price tags usually print the wine's name, size, and price — often more legibly than the bottle. When a bottle is lying down, angled, or its label is unreadable, identify the wine from the price tag nearest to it (tags normally sit directly below or beside their bottles — match by position). Combine tag text with whatever is visible on the bottle. The tag is also the authoritative source for listedPrice.
 - Set identified=true only when you are reasonably confident of the specific wine (producer + wine). Partial reads where the wine cannot be pinned down are identified=false.
 ${cacheNote}

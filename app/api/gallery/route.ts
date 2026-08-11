@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     result?: AnalysisResult;
     caption?: string;
     sceneType?: string;
+    replaceId?: string; // update an existing scan in place (post-edit)
   };
   if (!body?.image) {
     return Response.json({ error: "Missing image" }, { status: 400 });
@@ -118,6 +119,55 @@ export async function POST(request: Request) {
   }
 
   const token = getBlobToken();
+
+  // Replace mode: the user edited a saved scan — swap in the regenerated
+  // card, result, caption, and classification, keeping the entry's place,
+  // poster, and archived photo.
+  if (body.replaceId) {
+    const redis = getRedis()!;
+    const scanKey = `${SCAN_KEY_PREFIX}${body.replaceId}`;
+    const existing = await redis.get<ScanRecord>(scanKey);
+    if (!existing) {
+      return Response.json({ error: "Scan not found" }, { status: 404 });
+    }
+    const card = await put(`gallery/${body.replaceId}-card.jpg`, cardBytes, {
+      access: "public",
+      contentType: "image/jpeg",
+      addRandomSuffix: true,
+      token,
+    });
+    const caption = (body.caption ?? existing.caption).slice(0, 220);
+    const hasPrices = body.result
+      ? body.result.bottles.some((b) => b.listedPrice)
+      : existing.classification === "Seen";
+    const classification: ScanClassification = hasPrices ? "Seen" : "Consumed";
+    const updated: ScanRecord = {
+      ...existing,
+      cardUrl: card.url,
+      caption,
+      classification,
+      result: body.result ?? existing.result,
+    };
+    await redis.set(scanKey, updated);
+    const all = await redis.lrange<GalleryEntry>(LIST_KEY, 0, -1);
+    const rewritten = all.map((e) =>
+      e.id === body.replaceId
+        ? { ...e, url: card.url, caption, classification }
+        : e
+    );
+    const pipeline = redis.pipeline();
+    pipeline.del(LIST_KEY);
+    if (rewritten.length > 0) pipeline.rpush(LIST_KEY, ...rewritten);
+    await pipeline.exec();
+    if (existing.cardUrl && existing.cardUrl !== card.url) {
+      del(existing.cardUrl, { token }).catch(() => {});
+    }
+    return Response.json({
+      ok: true,
+      entry: rewritten.find((e) => e.id === body.replaceId) ?? null,
+    });
+  }
+
   const id = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const uploaded: string[] = [];
 

@@ -38,9 +38,11 @@ export interface BottleResult {
   region: string | null;
   grapeVariety: string | null;
   wineType: string | null; // red / white / rosé / sparkling / dessert / fortified
+  bottleSizeML: number | null; // 375/750/1500/3000; 750 when standard/unclear
   listedPrice: Money | null; // price shown in the photo (shelf tag or menu)
   marketPrice: Money | null; // typical retail price found online
   marketPriceSource: string | null;
+  marketPriceEstimated: boolean; // true when approximated (e.g. scaled from 750 mL)
   priceDeltaPct: number | null; // listed vs market: +40 = 40% markup, -15 = 15% discount
   ratings: Rating[];
   valueAssessment: string | null; // short judgement of listed vs market price
@@ -129,9 +131,19 @@ export const analysisJsonSchema = {
           region: { type: ["string", "null"] },
           grapeVariety: { type: ["string", "null"] },
           wineType: { type: ["string", "null"] },
+          bottleSizeML: {
+            type: ["number", "null"],
+            description:
+              "Bottle size in mL when discernible from the photo or tag (375, 750, 1500, 3000); 750 when standard or unclear",
+          },
           listedPrice: moneySchema,
           marketPrice: moneySchema,
           marketPriceSource: { type: ["string", "null"] },
+          marketPriceEstimated: {
+            type: "boolean",
+            description:
+              "true only when the market price was approximated (e.g. scaled from the 750 mL price) rather than found",
+          },
           priceDeltaPct: {
             type: ["number", "null"],
             description:
@@ -169,9 +181,11 @@ export const analysisJsonSchema = {
           "region",
           "grapeVariety",
           "wineType",
+          "bottleSizeML",
           "listedPrice",
           "marketPrice",
           "marketPriceSource",
+          "marketPriceEstimated",
           "priceDeltaPct",
           "ratings",
           "valueAssessment",

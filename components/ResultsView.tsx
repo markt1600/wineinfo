@@ -1,9 +1,17 @@
 "use client";
 
 import AnnotatedImage from "@/components/AnnotatedImage";
+import EditResults, { type ReviseEdit } from "@/components/EditResults";
 import InfographicCard from "@/components/InfographicCard";
 import type { AnalysisResult, BottleResult } from "@/lib/schema";
 import { formatTotals, marketTotals } from "@/lib/totals";
+
+function sizeLabel(ml: number): string {
+  if (ml === 375) return "375 mL (half)";
+  if (ml === 1500) return "1.5 L (magnum)";
+  if (ml === 3000) return "3 L (double magnum)";
+  return `${ml} mL`;
+}
 
 function money(m: { amount: number; currency: string } | null): string | null {
   if (!m) return null;
@@ -99,6 +107,12 @@ function BottleCard({
             <dd>{bottle.wineType}</dd>
           </>
         )}
+        {bottle.bottleSizeML != null && bottle.bottleSizeML !== 750 && (
+          <>
+            <dt>Size</dt>
+            <dd>{sizeLabel(bottle.bottleSizeML)}</dd>
+          </>
+        )}
         {bottle.listedPrice && (
           <>
             <dt>Listed price</dt>
@@ -110,6 +124,9 @@ function BottleCard({
             <dt>Market price</dt>
             <dd>
               {money(bottle.marketPrice)}
+              {bottle.marketPriceEstimated && (
+                <span style={{ color: "var(--gold)", fontWeight: 600 }}> *</span>
+              )}
               {bottle.marketPriceSource && (
                 <span style={{ color: "var(--muted)" }}>
                   {" "}
@@ -145,19 +162,25 @@ function BottleCard({
 interface Props {
   imageDataUrl: string;
   result: AnalysisResult;
-  replay?: boolean; // true when re-displaying a saved scan (no re-save)
-  onSaved?: () => void;
+  saveMode?: "new" | "replace" | "off";
+  scanId?: string | null;
+  revision?: number; // bumps after an edit → summary card regenerates + re-saves
+  onSaved?: (id: string | null) => void;
+  onRevise?: (edits: ReviseEdit[]) => Promise<void>;
   afterImage?: React.ReactNode; // e.g. the currency-confirmation card
 }
 
 // The full analysis display: annotated photo, summary + totals, per-bottle
-// details, and the shareable summary card. Used for fresh analyses and for
-// replaying saved scans.
+// details, the edit tab, and the shareable summary card. Used for fresh
+// analyses and for replaying saved scans.
 export default function ResultsView({
   imageDataUrl,
   result,
-  replay = false,
+  saveMode = "new",
+  scanId = null,
+  revision = 0,
   onSaved,
+  onRevise,
   afterImage,
 }: Props) {
   const bestValueId = result.bestValue.bottleId ?? null;
@@ -202,7 +225,14 @@ export default function ResultsView({
             No wine bottles or menu entries were found in this photo.
           </p>
         )}
+        {result.bottles.some((b) => b.marketPriceEstimated) && (
+          <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: 10 }}>
+            * price estimated by scaling from another bottle size
+          </p>
+        )}
       </div>
+
+      {onRevise && <EditResults result={result} onConfirm={onRevise} />}
 
       {result.bottles.length > 0 && (
         <div className="card">
@@ -210,11 +240,12 @@ export default function ResultsView({
             📱 Shareable summary
           </h2>
           <InfographicCard
-            key={imageDataUrl}
+            key={`${imageDataUrl}:${revision}:${saveMode}`}
             imageDataUrl={imageDataUrl}
             result={result}
             bestValueId={bestValueId}
-            autoSave={!replay}
+            saveMode={saveMode}
+            scanId={scanId}
             onSaved={onSaved}
           />
         </div>

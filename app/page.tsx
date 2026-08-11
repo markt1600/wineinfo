@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import Gallery from "@/components/Gallery";
 import ResultsView from "@/components/ResultsView";
+import type { ReviseEdit } from "@/components/EditResults";
 import type { AnalysisResult } from "@/lib/schema";
 
 const MAX_EDGE = 2576; // Claude's high-res vision limit (long edge)
@@ -67,6 +68,8 @@ export default function Home() {
   // Set when the pre-check found prices but couldn't pin down the currency —
   // holds the model's reasoning; the user answers before research starts.
   const [currencyRequest, setCurrencyRequest] = useState<string | null>(null);
+  const [savedScanId, setSavedScanId] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
 
   const analyze = async (img: Prepared, currencyHint?: string) => {
     setBusy(true);
@@ -74,6 +77,8 @@ export default function Home() {
     setResult(null);
     setAwaitingConfirm(false);
     setCurrencyRequest(null);
+    setSavedScanId(null);
+    setRevision(0);
     setProgress(0);
     setStatus("Uploading photo…");
     try {
@@ -328,8 +333,25 @@ export default function Home() {
         <ResultsView
           imageDataUrl={prepared.dataUrl}
           result={result}
+          saveMode={savedScanId && revision > 0 ? "replace" : "new"}
+          scanId={savedScanId}
+          revision={revision}
           afterImage={currencyCard}
-          onSaved={() => setGalleryRefresh((n) => n + 1)}
+          onSaved={(id) => {
+            if (id) setSavedScanId(id);
+            setGalleryRefresh((n) => n + 1);
+          }}
+          onRevise={async (edits: ReviseEdit[]) => {
+            const res = await fetch("/api/revise", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ result, edits }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error ?? "Revision failed");
+            setResult(data.result as AnalysisResult);
+            setRevision((r) => r + 1);
+          }}
         />
       )}
 

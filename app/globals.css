@@ -533,3 +533,44 @@ h2 {
   font-size: 0.75rem;
   margin-top: 2px;
 }
+
+.edit-row {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.edit-row:first-of-type {
+  border-top: none;
+}
+
+.edit-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.edit-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.edit-controls select {
+  flex: 1;
+}
+
+.edit-flag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  color: #d70015;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.edit-flag input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #d70015;
+}

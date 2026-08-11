@@ -15,8 +15,11 @@ interface Props {
   imageDataUrl: string;
   result: AnalysisResult;
   bestValueId: string | null;
-  autoSave?: boolean; // false when replaying an already-saved scan
-  onSaved?: () => void;
+  // "new" saves a fresh scan; "replace" overwrites scanId in place (after
+  // an edit); "off" renders without saving (plain replay).
+  saveMode?: "new" | "replace" | "off";
+  scanId?: string | null;
+  onSaved?: (id: string | null) => void;
 }
 
 // "Opus One 2019, Caymus 2021 +2 more · $412 at market"
@@ -58,13 +61,21 @@ function bottleName(b: BottleResult): string {
   );
 }
 
+function sizeLabel(ml: number): string {
+  if (ml === 1500) return "1.5L";
+  if (ml === 3000) return "3L";
+  return `${ml}mL`;
+}
+
 function bottleInfoLine(b: BottleResult): string {
   const parts: string[] = [];
+  if (b.bottleSizeML && b.bottleSizeML !== 750)
+    parts.push(sizeLabel(b.bottleSizeML));
   const r = b.ratings[0];
-  if (r) parts.push(`${r.source} ${r.score}${r.vintageMatch ? "" : "*"}`);
+  if (r) parts.push(`${r.source} ${r.score}${r.vintageMatch ? "" : "†"}`);
   if (b.marketPrice)
     parts.push(
-      `Mkt ${formatMoney(b.marketPrice.amount, b.marketPrice.currency)}`
+      `Mkt ${formatMoney(b.marketPrice.amount, b.marketPrice.currency)}${b.marketPriceEstimated ? "*" : ""}`
     );
   if (!b.identified) parts.push("not identified");
   else if (parts.length === 0) parts.push(b.region ?? "identified");
@@ -116,7 +127,8 @@ export default function InfographicCard({
   imageDataUrl,
   result,
   bestValueId,
-  autoSave = true,
+  saveMode = "new",
+  scanId,
   onSaved,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,7 +148,9 @@ export default function InfographicCard({
         quality -= 0.1;
         dataUrl = canvas.toDataURL("image/jpeg", quality);
       }
-      const photo = await compressPhoto(imageDataUrl);
+      // Replace mode keeps the archived photo; only new saves upload it.
+      const photo =
+        saveMode === "new" ? await compressPhoto(imageDataUrl) : null;
       const res = await fetch("/api/gallery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,11 +160,13 @@ export default function InfographicCard({
           result,
           caption: buildCaption(result),
           sceneType: result.sceneType,
+          ...(saveMode === "replace" && scanId ? { replaceId: scanId } : {}),
         }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         setSaveState("saved");
-        onSaved?.();
+        onSaved?.(data?.entry?.id ?? scanId ?? null);
       } else {
         // 503 = gallery storage not configured; anything else, don't retry.
         setSaveState("off");
@@ -359,14 +375,15 @@ export default function InfographicCard({
       // Footer
       ctx.font = "26px sans-serif";
       ctx.fillStyle = "rgba(201, 163, 173, 0.6)";
-      const foot = "* rating from a different/any vintage · made with Wine (a)ID";
+      const foot =
+        "† rating from another vintage · * estimated price · made with Wine (a)ID";
       ctx.fillText(foot, PAD, H - 32);
 
-      if (autoSave) void doSave(canvas);
+      if (saveMode !== "off") void doSave(canvas);
     };
     img.src = imageDataUrl;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageDataUrl, result, bestValueId, autoSave]);
+  }, [imageDataUrl, result, bestValueId, saveMode]);
 
   const download = () => {
     const canvas = canvasRef.current;

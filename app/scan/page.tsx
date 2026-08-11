@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ResultsView from "@/components/ResultsView";
+import type { ReviseEdit } from "@/components/EditResults";
 import type { AnalysisResult } from "@/lib/schema";
 
 interface ScanRecord {
@@ -26,6 +27,7 @@ function ScanView() {
   const id = params.get("id") ?? "";
   const [record, setRecord] = useState<ScanRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     if (!id) {
@@ -110,7 +112,20 @@ function ScanView() {
         <ResultsView
           imageDataUrl={record.photoUrl}
           result={record.result}
-          replay
+          saveMode={revision > 0 ? "replace" : "off"}
+          scanId={record.id}
+          revision={revision}
+          onRevise={async (edits: ReviseEdit[]) => {
+            const res = await fetch("/api/revise", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ result: record.result, edits }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error ?? "Revision failed");
+            setRecord({ ...record, result: data.result as AnalysisResult });
+            setRevision((r) => r + 1);
+          }}
         />
       )}
     </main>
