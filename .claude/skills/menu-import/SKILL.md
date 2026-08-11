@@ -126,6 +126,17 @@ creates scan-history or gallery entries.
      better than a US or European number). For other markets: local →
      international. Never skip a wine just because the local market has
      none — always fall through the ladder.
+   - **Authoritative Singapore sources, searched before wine-searcher:**
+     `millesima.sg` and `sg.cruworldwine.com`. For an SGD venue, the
+     first query attempt for each wine should target these (e.g.
+     `"<producer> <appellation> <vintage> millesima.sg OR cruworldwine
+     Singapore price"`); a hit on either (or another genuine SG
+     retailer) wins outright. Only fall through to HK and then the
+     wine-searcher-style international average when the SG-targeted
+     attempt comes up empty. When the winning listing is already in
+     SGD, report the SGD figure directly (`"sgd"` instead of `"usd"` in
+     the result row) so the CSV build doesn't round-trip it through
+     USD.
    - **NEVER use a restaurant's or bar's own wine-list price as the
      market price** — those already carry the very markup the app is
      measuring, so using one silently corrupts the listed-vs-market
