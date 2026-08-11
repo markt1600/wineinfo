@@ -13,6 +13,8 @@ interface ScanRecord {
   caption: string;
   sceneType: string;
   at: string;
+  postedBy?: string;
+  classification?: "Consumed" | "Seen";
   result: AnalysisResult;
 }
 
@@ -72,12 +74,13 @@ function ScanView() {
         </h1>
         {record && (
           <p>
-            Saved scan ·{" "}
+            {record.postedBy || "Guest"} posted on{" "}
             {new Date(record.at).toLocaleDateString(undefined, {
               year: "numeric",
               month: "long",
               day: "numeric",
             })}
+            {record.classification && ` · ${record.classification}`}
           </p>
         )}
       </header>

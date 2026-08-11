@@ -7,12 +7,19 @@ import type { AnalysisResult } from "@/lib/schema";
 export const LIST_KEY = "gallery:entries";
 export const SCAN_KEY_PREFIX = "scan:";
 
+// "Consumed" = a bottle lineup with no pricing (wines that were drunk);
+// "Seen" = priced wines spotted in a store or on a menu.
+export type ScanClassification = "Consumed" | "Seen";
+
 export interface GalleryEntry {
   id?: string; // scan record key suffix (absent on legacy entries)
   url: string; // summary card image
   caption: string;
   sceneType: string;
   at: string; // ISO timestamp
+  postedBy?: string; // display name ("Mark T.", "markt") — absent = Guest
+  username?: string; // stable account key; "guest" when not signed in
+  classification?: ScanClassification;
 }
 
 export interface ScanRecord {
@@ -22,6 +29,9 @@ export interface ScanRecord {
   caption: string;
   sceneType: string;
   at: string;
+  postedBy?: string;
+  username?: string;
+  classification?: ScanClassification;
   result: AnalysisResult;
 }
 

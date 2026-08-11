@@ -9,6 +9,8 @@ interface GalleryEntry {
   caption: string;
   sceneType: string;
   at: string;
+  postedBy?: string;
+  classification?: "Consumed" | "Seen";
 }
 
 // Full replay when the analysis was saved; legacy entries fall back to the
@@ -128,10 +130,13 @@ export default function Gallery({
             <span>
               {e.caption}
               <em>
+                {e.postedBy || "Guest"} posted on{" "}
                 {new Date(e.at).toLocaleDateString(undefined, {
                   month: "short",
                   day: "numeric",
                 })}
+                {e.classification &&
+                  ` · ${e.classification === "Consumed" ? "🍷" : "👀"} ${e.classification}`}
               </em>
             </span>
           </Link>

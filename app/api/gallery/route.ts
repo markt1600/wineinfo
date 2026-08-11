@@ -1,11 +1,13 @@
 import { del, list, put } from "@vercel/blob";
 import { getRedis } from "@/lib/redis";
+import { readSession } from "@/lib/auth";
 import {
   LIST_KEY,
   SCAN_KEY_PREFIX,
   galleryEnabled,
   getBlobToken,
   type GalleryEntry,
+  type ScanClassification,
   type ScanRecord,
 } from "@/lib/galleryStore";
 import type { AnalysisResult } from "@/lib/schema";
@@ -144,6 +146,18 @@ export async function POST(request: Request) {
     const caption = (body.caption ?? "").slice(0, 220);
     const sceneType = body.sceneType ?? "other";
 
+    // Attribution: signed-in user's display name, else Guest.
+    const session = readSession(request.headers.get("cookie"));
+    const postedBy = session?.displayName ?? "Guest";
+    const username = session?.username ?? "guest";
+
+    // Classification: priced scenes (store shelf, menu) are wines "Seen";
+    // unpriced bottle lineups are wines "Consumed".
+    const hasPrices = body.result
+      ? body.result.bottles.some((b) => b.listedPrice)
+      : sceneType === "shelf_with_prices" || sceneType === "wine_menu";
+    const classification: ScanClassification = hasPrices ? "Seen" : "Consumed";
+
     const redis = getRedis()!;
     // Full record for the replay view, when the client sent the analysis.
     // The entry only carries an id when the record actually exists —
@@ -157,6 +171,9 @@ export async function POST(request: Request) {
         caption,
         sceneType,
         at,
+        postedBy,
+        username,
+        classification,
         result: body.result!,
       };
       await redis.set(`${SCAN_KEY_PREFIX}${id}`, record);
@@ -167,6 +184,9 @@ export async function POST(request: Request) {
       caption,
       sceneType,
       at,
+      postedBy,
+      username,
+      classification,
     };
 
     await redis.lpush(LIST_KEY, entry);

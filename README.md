@@ -79,6 +79,22 @@ test the camera flow).
    database created directly at upstash.com works too — set
    `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.)
 
+## Accounts & attribution
+
+- The app works fully in **guest mode** — signing in is optional. A login item
+  sits in the nav (top bar on desktop, bottom tab bar on mobile).
+- **Two sign-in options:** Google (shows as "First L." in the feed; requires
+  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and the
+  `/api/auth/google/callback` redirect URI registered in Google Cloud), or a
+  simple **username + password** account (username with duplicate check,
+  password + confirmation — nothing else). Accounts are stored in the same
+  Redis database; set `AUTH_SECRET` for stable session cookies.
+- Every saved scan is attributed: the feed shows "Mark T. posted on Aug 11"
+  (or "Guest posted on…" when not signed in).
+- Scans are classified automatically: photos with prices (store shelf, menu)
+  are **Seen** 👀; unpriced bottle lineups are **Consumed** 🍷. The
+  classification is stored with each scan and shown in the feed.
+
 ## Cost controls
 
 Several measures keep per-photo Claude costs low (roughly $0.10–0.30 for a

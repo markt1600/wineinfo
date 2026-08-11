@@ -36,6 +36,137 @@ main {
   padding: 16px 20px 72px;
 }
 
+/* ---- Navigation: top bar on desktop, bottom tab bar on mobile ---- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+}
+
+.nav-brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 1rem;
+}
+
+.nav-brand em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.nav-items {
+  display: flex;
+  gap: 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 980px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  max-width: 160px;
+}
+
+.nav-item.active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .nav {
+    top: auto;
+    bottom: 0;
+    position: fixed;
+    left: 0;
+    right: 0;
+    border-bottom: none;
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .nav-brand {
+    display: none;
+  }
+
+  .nav-inner {
+    justify-content: center;
+    padding: 6px 8px;
+  }
+
+  .nav-items {
+    width: 100%;
+    justify-content: space-around;
+    gap: 0;
+  }
+
+  .nav-item {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.7rem;
+    padding: 6px 16px;
+  }
+
+  .nav-item .nav-icon {
+    font-size: 1.25rem;
+  }
+
+  main {
+    padding-bottom: 110px;
+  }
+}
+
+/* ---- Auth ---- */
+.auth-tabs {
+  display: flex;
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 12px;
+}
+
+.auth-tabs button {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.auth-tabs button.active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 header.app {
   text-align: center;
   padding: 32px 0 16px;
