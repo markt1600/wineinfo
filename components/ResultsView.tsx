@@ -49,7 +49,7 @@ function DeltaBadge({ pct }: { pct: number }) {
   return (
     <span
       style={{
-        color: markup ? "#d70015" : "#248a3d",
+        color: markup ? "var(--accent-press)" : "var(--good)",
         fontWeight: 600,
       }}
     >

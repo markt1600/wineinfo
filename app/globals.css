@@ -4,34 +4,78 @@
   padding: 0;
 }
 
+/* Design language borrowed from marktan.ai: warm paper, dark ink,
+   brick-red accent; Fraunces display, Newsreader body, JetBrains Mono
+   labels; hairline rules and near-square corners. */
 :root {
-  --bg: #f5f5f7;
-  --panel: #ffffff;
-  --panel-2: #f2f2f4;
-  --border: #e5e5ea;
-  --text: #1d1d1f;
-  --muted: #6e6e73;
-  --accent: #9f1239;
-  --accent-press: #881337;
-  --good: #34c759;
-  --bad: #ff3b30;
-  --gold: #a16207;
+  --bg: #f5efe2; /* paper */
+  --panel: #efe6d5; /* paper-2 */
+  --panel-2: #e9dec9; /* paper-3 */
+  --border: #cdc1a9; /* rule */
+  --border-strong: #b6a988; /* rule-strong */
+  --text: #211c15; /* ink */
+  --muted: #5a5142; /* ink-soft */
+  --faint: #8a7f6c; /* ink-faint */
+  --accent: #bb3b22;
+  --accent-press: #8f2c18;
+  --good: #2f6b43;
+  --bad: #bb3b22;
+  --gold: #8a6a1c;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Newsreader", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 html,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   font-size: 17px;
-  line-height: 1.47;
+  line-height: 1.5;
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
   /* Native-app feel on phones */
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+
+/* Paper grain, as on marktan.ai */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Accent bar across the very top of the page */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-press));
+  z-index: 200;
+  pointer-events: none;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
 }
 
 button,
@@ -59,7 +103,7 @@ main {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(245, 239, 226, 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
@@ -75,14 +119,16 @@ main {
 }
 
 .nav-brand {
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 800;
   letter-spacing: -0.01em;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .nav-brand em {
-  font-style: normal;
-  color: var(--accent);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent-press);
 }
 
 .nav-items {
@@ -95,7 +141,7 @@ main {
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: 980px;
+  border-radius: 2px;
   text-decoration: none;
   color: var(--muted);
   font-size: 0.9rem;
@@ -104,8 +150,8 @@ main {
 }
 
 .nav-item.active {
-  background: var(--panel-2);
-  color: var(--text);
+  background: var(--text);
+  color: var(--bg);
 }
 
 .nav-label {
@@ -129,7 +175,7 @@ main {
        The translateZ compositing-layer hack only made it rarer — the
        real cure is no blur on the fixed bar at all: solid background,
        filter off. Keep the layer hints as belt-and-braces. */
-    background: #fff;
+    background: var(--bg);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     transform: translateZ(0);
@@ -173,7 +219,7 @@ main {
 .auth-tabs {
   display: flex;
   background: var(--panel-2);
-  border-radius: 12px;
+  border-radius: 3px;
   padding: 4px;
   margin-bottom: 12px;
 }
@@ -182,7 +228,7 @@ main {
   flex: 1;
   padding: 9px 0;
   border: none;
-  border-radius: 9px;
+  border-radius: 2px;
   background: transparent;
   color: var(--muted);
   font-size: 0.92rem;
@@ -192,9 +238,8 @@ main {
 }
 
 .auth-tabs button.active {
-  background: var(--panel);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--text);
+  color: var(--bg);
 }
 
 header.app {
@@ -203,31 +248,34 @@ header.app {
 }
 
 header.app h1 {
-  font-size: 2rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 0.95;
 }
 
 header.app h1 span {
-  color: var(--accent);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent-press);
 }
 
 header.app p {
   color: var(--muted);
-  font-size: 0.95rem;
-  margin-top: 8px;
+  font-size: 1rem;
+  font-style: italic;
+  margin-top: 10px;
   font-weight: 400;
 }
 
 .card {
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
   padding: 20px;
   margin-top: 16px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(40, 30, 15, 0.06);
 }
 
 .btn {
@@ -237,14 +285,14 @@ header.app p {
   gap: 8px;
   width: 100%;
   padding: 14px 20px;
-  border-radius: 980px;
-  border: none;
+  border-radius: 2px;
+  border: 1px solid var(--accent-press);
   font-size: 1.02rem;
   font-weight: 600;
-  font-family: inherit;
+  font-family: var(--font-display);
   cursor: pointer;
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   transition:
     background 0.15s,
     opacity 0.15s,
@@ -262,13 +310,15 @@ header.app p {
 }
 
 .btn.secondary {
-  background: var(--panel-2);
+  background: var(--panel);
   color: var(--text);
-  border: none;
+  border: 1px solid var(--border-strong);
 }
 
 .btn.secondary:active {
-  background: var(--border);
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
 .btn + .btn {
@@ -279,7 +329,7 @@ header.app p {
 .preview canvas {
   width: 100%;
   height: auto;
-  border-radius: 14px;
+  border-radius: 3px;
   display: block;
 }
 
@@ -311,7 +361,7 @@ header.app p {
 .progress-track {
   height: 5px;
   background: var(--panel-2);
-  border-radius: 99px;
+  border-radius: 2px;
   margin-top: 8px;
   overflow: hidden;
 }
@@ -319,7 +369,7 @@ header.app p {
 .progress-fill {
   height: 100%;
   background: var(--accent);
-  border-radius: 99px;
+  border-radius: 2px;
   transition: width 0.4s ease;
 }
 
@@ -341,7 +391,7 @@ header.app p {
   display: inline-block;
   width: 11px;
   height: 11px;
-  border-radius: 4px;
+  border-radius: 2px;
   margin-right: 6px;
   vertical-align: -1px;
 }
@@ -375,26 +425,27 @@ header.app p {
 }
 
 .bottle .tag {
-  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 99px;
+  padding: 3px 9px;
+  border-radius: 2px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
 }
 
 .tag.identified {
-  background: rgba(52, 199, 89, 0.12);
-  color: #248a3d;
+  background: rgba(47, 107, 67, 0.13);
+  color: var(--good);
 }
 
 .tag.unidentified {
-  background: rgba(255, 59, 48, 0.1);
-  color: #d70015;
+  background: rgba(187, 59, 34, 0.12);
+  color: var(--accent-press);
 }
 
 .tag.best {
-  background: rgba(161, 98, 7, 0.1);
+  background: rgba(138, 106, 28, 0.13);
   color: var(--gold);
 }
 
@@ -422,9 +473,9 @@ header.app p {
 }
 
 .best-banner {
-  border: 1px solid rgba(161, 98, 7, 0.25);
-  background: rgba(161, 98, 7, 0.06);
-  border-radius: 14px;
+  border: 1px solid rgba(138, 106, 28, 0.35);
+  background: rgba(138, 106, 28, 0.07);
+  border-radius: 3px;
   padding: 14px 16px;
   margin-top: 14px;
   font-size: 0.94rem;
@@ -440,10 +491,10 @@ input.currency {
   width: 100%;
   padding: 13px 14px;
   margin: 10px 0;
-  border-radius: 12px;
-  background: var(--panel);
+  border-radius: 2px;
+  background: var(--bg);
   color: var(--text);
-  border: 1px solid #d2d2d7;
+  border: 1px solid var(--border-strong);
   font-size: 1rem;
   font-family: inherit;
   appearance: none;
@@ -454,7 +505,7 @@ select.currency:focus,
 input.currency:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(159, 18, 57, 0.12);
+  box-shadow: 0 0 0 3px rgba(187, 59, 34, 0.14);
 }
 
 a {
@@ -476,8 +527,8 @@ h2 {
   display: block;
   text-decoration: none;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -545,7 +596,7 @@ h2 {
   width: 48px;
   height: 84px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 2px;
   border: 1px solid var(--border);
   flex-shrink: 0;
   background: var(--panel-2);
@@ -594,7 +645,7 @@ h2 {
   align-items: center;
   gap: 7px;
   font-size: 0.88rem;
-  color: #d70015;
+  color: var(--accent-press);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -602,17 +653,17 @@ h2 {
 .edit-flag input[type="checkbox"] {
   width: 20px;
   height: 20px;
-  accent-color: #d70015;
+  accent-color: var(--accent-press);
 }
 
 .edit-notes {
   width: 100%;
   margin-top: 10px;
   padding: 11px 13px;
-  border-radius: 12px;
-  background: var(--panel);
+  border-radius: 2px;
+  background: var(--bg);
   color: var(--text);
-  border: 1px solid #d2d2d7;
+  border: 1px solid var(--border-strong);
   font-size: 16px; /* ≥16px avoids iOS focus zoom */
   font-family: inherit;
   line-height: 1.4;
@@ -707,9 +758,9 @@ h2 {
 .venue-stale-banner {
   margin-top: 10px;
   padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(255, 149, 0, 0.12);
-  border: 1px solid rgba(255, 149, 0, 0.4);
+  border-radius: 3px;
+  background: rgba(138, 106, 28, 0.1);
+  border: 1px solid rgba(138, 106, 28, 0.45);
   font-size: 0.85rem;
 }
 
@@ -725,8 +776,8 @@ h2 {
   width: 110px;
   height: 150px;
   object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
   background: var(--panel-2);
   flex-shrink: 0;
 }
@@ -740,19 +791,21 @@ h2 {
 
 .chip {
   padding: 7px 14px;
-  border-radius: 980px;
-  border: 1px solid var(--border);
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
   background: var(--panel);
   color: var(--text);
   font-size: 0.85rem;
+  font-family: var(--font-body);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
   font-weight: 600;
 }
 
@@ -774,19 +827,22 @@ h2 {
 .venue-badge {
   display: inline-block;
   margin-right: 8px;
-  padding: 1px 8px;
-  border-radius: 980px;
-  background: rgba(161, 98, 7, 0.12);
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: rgba(138, 106, 28, 0.13);
   color: var(--gold);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .venue-stale {
   margin-left: 8px;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #b45309;
+  color: var(--gold);
   white-space: nowrap;
 }
 
@@ -814,10 +870,10 @@ h2 {
 .venue-edit-input {
   width: 90px;
   padding: 7px 10px;
-  border-radius: 10px;
-  background: var(--panel);
+  border-radius: 2px;
+  background: var(--bg);
   color: var(--text);
-  border: 1px solid #d2d2d7;
+  border: 1px solid var(--border-strong);
   font-size: 16px; /* >=16px avoids iOS focus zoom */
   font-family: inherit;
 }

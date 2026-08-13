@@ -180,17 +180,17 @@ export default function InfographicCard({
 
       // Background
       const bg = ctx.createLinearGradient(0, 0, 0, H);
-      bg.addColorStop(0, "#2b0a12");
-      bg.addColorStop(1, "#14040a");
+      bg.addColorStop(0, "#f5efe2");
+      bg.addColorStop(1, "#efe6d5");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
       // Header
-      ctx.fillStyle = "#f5e9ec";
-      ctx.font = "bold 64px sans-serif";
+      ctx.fillStyle = "#211c15";
+      ctx.font = '800 64px "Fraunces", Georgia, serif';
       ctx.fillText("🍷 Wine (a)ID", PAD, PAD + 58);
-      ctx.font = "34px sans-serif";
-      ctx.fillStyle = "#c9a3ad";
+      ctx.font = '500 28px "JetBrains Mono", monospace';
+      ctx.fillStyle = "#5a5142";
       const date = new Date().toLocaleDateString(undefined, {
         year: "numeric",
         month: "short",
@@ -229,7 +229,7 @@ export default function InfographicCard({
       ctx.clip();
       ctx.drawImage(img, dx, dy, dw, dh);
       ctx.restore();
-      ctx.strokeStyle = "#57202c";
+      ctx.strokeStyle = "#b6a988";
       ctx.lineWidth = 3;
       roundRectPath(ctx, dx, dy, dw, dh, 24);
       ctx.stroke();
@@ -240,15 +240,15 @@ export default function InfographicCard({
       const totals = marketTotals(result);
       const totalStr = formatTotals(totals);
       const barY = photoTop + photoH + 28;
-      ctx.fillStyle = "rgba(240, 196, 108, 0.10)";
+      ctx.fillStyle = "rgba(187, 59, 34, 0.07)";
       roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
       ctx.fill();
-      ctx.strokeStyle = "#f0c46c";
+      ctx.strokeStyle = "#bb3b22";
       ctx.lineWidth = 2;
       roundRectPath(ctx, PAD, barY, W - PAD * 2, totalsH, 20);
       ctx.stroke();
-      ctx.font = "34px sans-serif";
-      ctx.fillStyle = "#c9a3ad";
+      ctx.font = '500 28px "JetBrains Mono", monospace';
+      ctx.fillStyle = "#5a5142";
       const pricedN = pricedBottleCount(result);
       ctx.fillText(
         pricedN > 0
@@ -257,8 +257,8 @@ export default function InfographicCard({
         PAD + 36,
         barY + 56
       );
-      ctx.font = "bold 58px sans-serif";
-      ctx.fillStyle = "#f0c46c";
+      ctx.font = '600 58px "Fraunces", Georgia, serif';
+      ctx.fillStyle = "#8f2c18";
       ctx.fillText(
         totalStr ?? "n/a — no market prices found",
         PAD + 36,
@@ -290,8 +290,8 @@ export default function InfographicCard({
 
         // status dot
         ctx.fillStyle = b.identified
-          ? "rgba(61, 220, 132, 0.9)"
-          : "rgba(255, 107, 107, 0.9)";
+          ? "rgba(47, 107, 67, 0.9)"
+          : "rgba(187, 59, 34, 0.9)";
         ctx.beginPath();
         ctx.arc(PAD + 14, y + rowH / 2 - 10, 12, 0, Math.PI * 2);
         ctx.fill();
@@ -301,8 +301,8 @@ export default function InfographicCard({
         const nameMaxW = W - PAD - textX - priceColW;
 
         // name line
-        ctx.font = `bold 38px sans-serif`;
-        ctx.fillStyle = isBest ? "#f0c46c" : "#f5e9ec";
+        ctx.font = '600 38px "Fraunces", Georgia, serif';
+        ctx.fillStyle = isBest ? "#8a6a1c" : "#211c15";
         const star = isBest ? "★ " : "";
         ctx.fillText(
           truncate(ctx, `${star}${bottleName(b)}`, nameMaxW),
@@ -311,8 +311,8 @@ export default function InfographicCard({
         );
 
         // info line (rating, market price, …)
-        ctx.font = "31px sans-serif";
-        ctx.fillStyle = "#c9a3ad";
+        ctx.font = '400 31px "Newsreader", Georgia, serif';
+        ctx.fillStyle = "#5a5142";
         ctx.fillText(
           truncate(ctx, bottleInfoLine(b), nameMaxW),
           textX,
@@ -323,8 +323,8 @@ export default function InfographicCard({
         // markup/discount vs market underneath — red markup, green discount
         const price = b.listedPrice ?? b.marketPrice;
         if (price && price.currency !== "UNK") {
-          ctx.font = "bold 40px sans-serif";
-          ctx.fillStyle = "#f5e9ec";
+          ctx.font = '600 40px "Fraunces", Georgia, serif';
+          ctx.fillStyle = "#211c15";
           const label = formatMoney(price.amount, price.currency);
           ctx.fillText(
             label,
@@ -332,21 +332,21 @@ export default function InfographicCard({
             y + rowH / 2 + 4
           );
           if (b.listedPrice) {
-            ctx.font = "bold 27px sans-serif";
+            ctx.font = '600 27px "JetBrains Mono", monospace';
             let sub: string;
             if (b.priceDeltaPct != null && Math.abs(b.priceDeltaPct) >= 1) {
               const markup = b.priceDeltaPct > 0;
               sub = markup
                 ? `+${Math.round(b.priceDeltaPct)}% vs mkt`
                 : `−${Math.round(Math.abs(b.priceDeltaPct))}% vs mkt`;
-              ctx.fillStyle = markup ? "#ff6b6b" : "#3ddc84";
+              ctx.fillStyle = markup ? "#bb3b22" : "#2f6b43";
             } else if (b.priceDeltaPct != null) {
               sub = "≈ market";
-              ctx.fillStyle = "#c9a3ad";
+              ctx.fillStyle = "#8a7f6c";
             } else {
               sub = "listed";
-              ctx.fillStyle = "#c9a3ad";
-              ctx.font = "26px sans-serif";
+              ctx.fillStyle = "#8a7f6c";
+              ctx.font = '400 26px "Newsreader", Georgia, serif';
             }
             ctx.fillText(
               sub,
@@ -357,7 +357,7 @@ export default function InfographicCard({
         }
 
         // separator
-        ctx.strokeStyle = "rgba(87, 32, 44, 0.6)";
+        ctx.strokeStyle = "rgba(205, 193, 169, 0.9)";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(PAD, y + rowH);
@@ -367,14 +367,14 @@ export default function InfographicCard({
         y += rowH;
       }
       if (overflow > 0) {
-        ctx.font = "italic 32px sans-serif";
-        ctx.fillStyle = "#c9a3ad";
+        ctx.font = 'italic 32px "Newsreader", Georgia, serif';
+        ctx.fillStyle = "#5a5142";
         ctx.fillText(`+ ${overflow} more wine${overflow > 1 ? "s" : ""}`, PAD + 48, y + rowH / 2);
       }
 
       // Footer
-      ctx.font = "26px sans-serif";
-      ctx.fillStyle = "rgba(201, 163, 173, 0.6)";
+      ctx.font = '500 24px "JetBrains Mono", monospace';
+      ctx.fillStyle = "rgba(90, 81, 66, 0.75)";
       const foot =
         "† rating from another vintage · * estimated price · made with Wine (a)ID";
       ctx.fillText(foot, PAD, H - 32);
